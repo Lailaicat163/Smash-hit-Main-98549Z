@@ -1,0 +1,18 @@
+{
+	"project": {
+		"name": "Smash_Hit",
+		"slot": 2,
+		"description": "you want to crash our robot? You could try to do it, but might be your robot get crash first.",
+		"platform": "V5",
+		"creationDate": "Fri, 09 May 2025 16:57:34 GMT",
+		"language": "cpp",
+		"sdkVersion": "V5_20240802_15_00_00",
+		"cpp": {
+			"includePath": []
+		}
+	},
+	"extension": {
+		"version": "0.7.2025041600",
+		"json": 1
+	}
+}
