@@ -7,6 +7,7 @@
 #include <string.h>
 
 
+
 #include "vex.h"
 
 using namespace vex;
@@ -43,9 +44,18 @@ motor IntakeMotor = motor(PORT12, ratio18_1, true);
 motor UpperMotor = motor(PORT13, ratio36_1, true);
 motor Second_IM = motor(PORT14, ratio18_1, true);
 
+//Pneumatic A is for the scraper mechanism
 digital_out Pneumatic = digital_out(Brain.ThreeWirePort.A);
 
+//Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
+rotation rotational = rotation(PORT11, false);
 
+//Initializes the inertial sensor. starts from 0 degrees and increases by turning clockwise.
+inertial inertialSensor = inertial(PORT1);
+
+
+//sets max rpm of motors
+float maxRPM = 600.0;
 
 // controller Controller2 = controller(partner);
 
@@ -142,6 +152,68 @@ int rc_auto_loop_function_Controller1() {
 
 task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 
+//////////////////////////////////////////////
+//Start PID FUNCTIONS AND AUTO CODE
+//////////////////////////////////////////////
+//Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to change position.
+double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
+//double robotPosiition[3] = {67.5, 17.5, 90};  //left side of the field
+
+//PID Settings; Tweak these values to tune PID.
+//For going straight
+double kP = 0;
+double kI = 0;
+double kD = 0;
+
+//For turning
+double turning_kP = 0;
+double turning_kI = 0;
+double turning_kD = 0;
+
+//Initializing other variables for PID. These will be changed by the function, not the user.
+//distance errors
+double distanceError; //Current value - desired value: Positional Value
+double prevDistanceError = 0; //Positional Value 20 milliseconds ago
+double derivativeDistanceError; //error - prevError: Speed Value
+double integralDistanceError = 0; //Total error = total error + error
+
+//Turning errors
+double headingError; //Current value - desired value: Positional Value
+double prevHeadingError = 0; //Positional Value 20 milliseconds ago
+double derivativeHeadingError; //error - prevError: Speed Value
+double integralHeadingError = 0; //Total error = total error + error
+//PID settings end
+
+//Variables modified for use
+bool resetPID_Sensors = false;
+bool enableDrivePID = false;
+
+//NOT DONE THE PID FUNCTION PLZ DON'T TOUCH
+//PID FUNCTION STARTS HERE
+int drivePID(double x_value, double, double heading_value) {
+  while(enableDrivePID) {
+    if (resetPID_Sensors == true) {
+      //Resets the sensors and variables
+      rotational.resetPosition();
+      distanceError = 0;
+      prevDistanceError = 0;
+      derivativeDistanceError = 0;
+      integralDistanceError = 0;
+      headingError = 0;
+      prevHeadingError = 0;
+      derivativeHeadingError = 0;
+      integralHeadingError = 0;
+      resetPID_Sensors = false;
+    }
+    //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
+    //double distanceTravelled = fabs(rotational.position(deg)) * math.pi / 180 * 1.375;  //1.375 is radius of wheel in inches
+
+  }
+
+  return 2; // doesn't matter what it returns
+}
+
+
 #pragma endregion VEXcode Generated Robot Configuration
 
 // ----------------------------------------------------------------------------
@@ -159,7 +231,6 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 // Allows for easier use of the VEX Library
 using namespace vex;
 
-
 // Begin project code
 
 void preAutonomous(void) {
@@ -168,6 +239,12 @@ void preAutonomous(void) {
   Brain.Screen.print("pre auton code");
   wait(1, seconds);
   Drivetrain.setDriveVelocity(100, percent);
+  rotational.resetPosition(); //resetting the rotational sensor position to 0
+  //calibrating the inertial sensor MUST DO THIS
+  inertialSensor.calibrate(); //in this version inertial var isn't here but assuming it is.
+  while(inertialSensor.isCalibrating()){
+    wait(100, msec);
+  }
 }
 
 void autonomous(void) {
@@ -178,13 +255,23 @@ void autonomous(void) {
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
   // place automonous code here
-  Drivetrain.driveFor(forward, 300, mm);
-  IntakeMotor.spin(forward);
-  Second_IM.spin(reverse);
-  wait(2, seconds);
-  IntakeMotor.stop();
-  Second_IM.stop();
-  Drivetrain.driveFor(reverse, 300, mm);
+  enableDrivePID = true;
+  while (robotPosition[0] != 100 and robotPosition[1] != 80 and robotPosition[2] != 50) {
+    drivePID(100, 80, 50);
+  }
+  resetPID_Sensors = true;
+  while (robotPosition[0] != 150 and robotPosition[1] != 90 and robotPosition[2] != 50) {
+    drivePID(150, 90, 50);
+  }
+  resetPID_Sensors = true;
+  //Charlie I commented out the auton code for the PID Code. 
+  // Drivetrain.driveFor(forward, 300, mm);
+  // IntakeMotor.spin(forward);
+  // Second_IM.spin(reverse);
+  // wait(2, seconds);
+  // IntakeMotor.stop();
+  // Second_IM.stop();
+  // Drivetrain.driveFor(reverse, 300, mm);
 }
 
 bool pneumatic_state = true;
@@ -234,6 +321,7 @@ void userControl(void) {
   // place driver control in this while loop
   
   while(true){
+    enableDrivePID = false; //disables PID control during user control
     wait(10, msec);
     input();
   }  
