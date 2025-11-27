@@ -7,6 +7,7 @@
 #include <string.h>
 
 
+
 #include "vex.h"
 
 using namespace vex;
@@ -45,7 +46,11 @@ motor Second_IM = motor(PORT14, ratio18_1, true);
 
 digital_out Pneumatic_A = digital_out(Brain.ThreeWirePort.A);
 
+//Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
+rotation rotational = rotation(PORT11, false);
 
+//sets max rpm of motors
+float maxRPM = 600.0;
 
 // controller Controller2 = controller(partner);
 
