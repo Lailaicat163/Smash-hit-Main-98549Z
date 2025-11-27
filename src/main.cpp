@@ -43,7 +43,7 @@ motor IntakeMotor = motor(PORT12, ratio18_1, true);
 motor UpperMotor = motor(PORT13, ratio36_1, true);
 motor Second_IM = motor(PORT14, ratio18_1, true);
 
-digital_out Pneumatic_A = digital_out(Brain.ThreeWirePort.A);
+digital_out Pneumatic = digital_out(Brain.ThreeWirePort.A);
 
 
 
@@ -187,6 +187,8 @@ void autonomous(void) {
   Drivetrain.driveFor(reverse, 300, mm);
 }
 
+bool pneumatic_state = true;
+
 //following codes are for input purpose, if there are some bugs exist, 
 //then put the codes back to userc=Control
 void input(){
@@ -211,7 +213,16 @@ void input(){
   else{
     UpperMotor.stop();
   }
-}
+  if (Controller1.ButtonA.pressing() == true){
+    wait(10, msec);
+    if (pneumatic_state == true){
+      Pneumatic.set(false);
+    }
+    else{
+      Pneumatic.set(true);
+    }
+  }
+}//trrestrest
 
 event Input;
 
