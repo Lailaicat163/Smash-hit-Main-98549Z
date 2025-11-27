@@ -264,14 +264,7 @@ void autonomous(void) {
     drivePID(150, 90, 50);
   }
   resetPID_Sensors = true;
-  //Charlie I commented out the auton code for the PID Code. 
-  // Drivetrain.driveFor(forward, 300, mm);
-  // IntakeMotor.spin(forward);
-  // Second_IM.spin(reverse);
-  // wait(2, seconds);
-  // IntakeMotor.stop();
-  // Second_IM.stop();
-  // Drivetrain.driveFor(reverse, 300, mm);
+  //juking master;
 }
 
 bool pneumatic_state = true;
