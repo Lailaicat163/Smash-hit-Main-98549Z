@@ -330,7 +330,7 @@ void autonomous(void) {
   // resetPID_Sensors = true;
 }
 
-bool scraperState = true;
+bool scraperState = false;
 
 //following codes are for input purpose, if there are some bugs exist, 
 //then put the codes back to userc=Control
