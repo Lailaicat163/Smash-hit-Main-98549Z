@@ -379,12 +379,12 @@ void userControl(void) {
   RightDriveSmart.setStopping(brake);
   IntakeMotor.setStopping(brake);
   IntakeMotor.setVelocity(100, percent);
+  Controller1.ButtonA.pressed(Scraper);
   // place driver control in this while loop
   
   while(true){
     enableDrivePID = false; //disables PID control during user control
     wait(10, msec);
-    Controller1.ButtonA.pressed(Scraper);
     input();
   }  
 }
