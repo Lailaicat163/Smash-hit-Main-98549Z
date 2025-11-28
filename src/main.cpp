@@ -163,12 +163,12 @@ static double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
 
 //PID Settings; Tweak these values to tune PID.
 //For going straight
-const double kP = 0;
+const double kP = 0.07;
 const double kI = 0;
 const double kD = 0;
 
 //For turning
-const double turning_kP = 0;
+const double turning_kP = 0.5;
 const double turning_kI = 0;
 const double turning_kD = 0;
 
@@ -306,6 +306,9 @@ void preAutonomous(void) {
   while(inertialSensor.isCalibrating() == true) {
     wait(20, msec);
   }
+  if (inertialSensor.isCalibrating() == false) {
+    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+  }
 }
 
 void autonomous(void) {
@@ -317,14 +320,14 @@ void autonomous(void) {
   Second_IM.setVelocity(100, percent);
   // place automonous code here
   enableDrivePID = true;
-  while (robotPosition[0] != 100 and robotPosition[1] != 80 and robotPosition[2] != 50) {
-    drivePID(100, 80, 50);
+  while (robotPosition[0] != 87.5 and robotPosition[1] != 22.5 and robotPosition[2] != 0) {
+    drivePID(87.5, 22.5, 0);
   }
   resetPID_Sensors = true;
-  while (robotPosition[0] != 150 and robotPosition[1] != 90 and robotPosition[2] != 50) {
-    drivePID(150, 90, 50);
-  }
-  resetPID_Sensors = true;
+  // while (robotPosition[0] != 150 and robotPosition[1] != 90 and robotPosition[2] != 50) {
+  //   drivePID(150, 90, 50);
+  // }
+  // resetPID_Sensors = true;
 }
 
 bool scraperState = true;
