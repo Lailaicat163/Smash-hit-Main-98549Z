@@ -45,13 +45,13 @@ motor UpperMotor = motor(PORT13, ratio36_1, true);
 motor Second_IM = motor(PORT14, ratio18_1, true);
 
 //Pneumatic A is for the scraper mechanism
-digital_out Pneumatic = digital_out(Brain.ThreeWirePort.A);
+digital_out scraper = digital_out(Brain.ThreeWirePort.A);
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
-rotation rotational = rotation(PORT11, false);
+rotation rotational = rotation(PORT17, false);
 
 //Initializes the inertial sensor. starts from 0 degrees and increases by turning clockwise.
-inertial inertialSensor = inertial(PORT1);
+inertial inertialSensor = inertial(PORT19);
 
 
 //sets max rpm of motors
@@ -155,7 +155,7 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 //////////////////////////////////////////////
 //Start PID FUNCTIONS AND AUTO CODE
 //////////////////////////////////////////////
-//Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to change position.
+//Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to start change position.
 double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
 //double robotPosiition[3] = {67.5, 17.5, 90};  //left side of the field
 
@@ -264,10 +264,9 @@ void autonomous(void) {
     drivePID(150, 90, 50);
   }
   resetPID_Sensors = true;
-  //juking master;
 }
 
-bool pneumatic_state = true;
+bool scraperState = true;
 
 //following codes are for input purpose, if there are some bugs exist, 
 //then put the codes back to userc=Control
@@ -295,11 +294,11 @@ void input(){
   }
   if (Controller1.ButtonA.pressing() == true){
     wait(10, msec);
-    if (pneumatic_state == true){
-      Pneumatic.set(false);
+    if (scraperState == true){
+      scraper.set(false);
     }
     else{
-      Pneumatic.set(true);
+      scraper.set(true);
     }
   }
 }//trrestrest
