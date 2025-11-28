@@ -268,10 +268,17 @@ int drivePID(double x_value, double y_value, double heading_value) {
     //Sets prevError to current error
     prevDistanceError = distanceError;
     prevHeadingError = headingError;
-    return 1;  // doesn't matter what it returns
+    //Debugging info on screen
+    Brain.Screen.clearScreen();
+    Brain.Screen.setCursor(1, 1);
+    Brain.Screen.print("Dist Error: %.2f", distanceError);
+    Brain.Screen.setCursor(2, 1);
+    Brain.Screen.print("Motor Power: %.2f", motorPower);
+    Brain.Screen.setCursor(3, 1);
+    Brain.Screen.print("Position: %.1f, %.1f", robotPosition[0], robotPosition[1]);
     vex::task::sleep(20); //waits 20 milliseconds before next loop
   }
-  return 2; // doesn't matter what it returns
+  return 0; // doesn't matter what it returns
 }
 
 
@@ -319,10 +326,17 @@ void autonomous(void) {
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
   // place automonous code here
+  // Start PID control
+  resetPID_Sensors = true;
   enableDrivePID = true;
-  while (robotPosition[0] != 87.5 and robotPosition[1] != 22.5 and robotPosition[2] != 0) {
-    drivePID(87.5, 22.5, 0);
-  }
+  
+  // Call PID directly - it will loop internally
+  drivePID(87.5, 22.5, 0);
+  
+  // When it finishes, continue to next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // drivePID(nextX, nextY, nextHeading);
   resetPID_Sensors = true;
   // while (robotPosition[0] != 150 and robotPosition[1] != 90 and robotPosition[2] != 50) {
   //   drivePID(150, 90, 50);
