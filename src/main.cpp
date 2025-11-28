@@ -270,6 +270,7 @@ int drivePID(double x_value, double y_value, double heading_value) {
     prevHeadingError = headingError;
     return 1;  // doesn't matter what it returns
     vex::task::sleep(20); //waits 20 milliseconds before next loop
+  }
   return 2; // doesn't matter what it returns
 }
 
