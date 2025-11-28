@@ -239,7 +239,7 @@ int drivePID(double x_value, double y_value, double heading_value) {
     }
     //Derivative and integral error calculations MAY BE CHANGED LATER INTO ABS VALUE
     derivativeHeadingError = headingError - prevHeadingError;
-    if (fabs(headingError) < 5) { //integral windup prevention. makes it so that integral only adds up when close to target
+    if (fabs(headingError) < 15) { //integral windup prevention. makes it so that integral only adds up when close to target
       integralHeadingError += headingError;
     } else {
       integralHeadingError = 0;
