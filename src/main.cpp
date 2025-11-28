@@ -57,7 +57,7 @@ inertial inertialSensor = inertial(PORT19);
 
 
 //sets max rpm of motors
-float maxRPM = 600.0;
+const float maxMotorRPM = 600.0;
 
 // controller Controller2 = controller(partner);
 
@@ -208,18 +208,68 @@ int drivePID(double x_value, double y_value, double heading_value) {
       resetPID_Sensors = false;
     }
     //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
-    double distanceTravelled = fabs(rotational.position(deg)) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
+    double distanceTravelled = rotational.position(deg) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
     double robotHeading = inertialSensor.heading(); //in degrees
     //Calculates target values for distance
-    static double targetDistance = sqrt( pow(x_value - robotPosition[0], 2) + pow(y_value - robotPosition[1], 2) );
+    double targetDistance = sqrt( pow(x_value - robotPosition[0], 2) + pow(y_value - robotPosition[1], 2) );
+    //Forward movement error calculations
     distanceError = targetDistance - distanceTravelled;
-    //Derivative and integral error calculations MAY BE CHANGED LATER INTO ABS VALUE
+    //Derivative and integral error calculations
     derivativeDistanceError = distanceError - prevDistanceError;
-    integralDistanceError += distanceError;
+    if (fabs(distanceError) < 5) { //integral windup prevention. makes it so that integral only adds up when close to target
+      integralDistanceError += distanceError;
+    } else {
+      integralDistanceError = 0;
+    }
     //Calculation of motor power
     double motorPower = (distanceError * kP) + (integralDistanceError * kI) + (derivativeDistanceError * kD);
-  }
+    //end forward movement error calculations
+    //START Angular movement calculations
+    double headingError = heading_value - robotHeading + 540.0;
 
+    // Use fmod for floating-point modulo. modulo is the remainder after division
+    headingError = fmod(headingError, 360.0);
+    // Ensures positive result.
+    if (headingError < 0) {
+      headingError += 360.0;
+    }
+    //This sets the calculations in range of -180 to 180 degrees
+    if (headingError > 180.0) {
+    headingError -= 360.0;
+    }
+    //Derivative and integral error calculations MAY BE CHANGED LATER INTO ABS VALUE
+    derivativeHeadingError = headingError - prevHeadingError;
+    if (fabs(headingError) < 5) { //integral windup prevention. makes it so that integral only adds up when close to target
+      integralHeadingError += headingError;
+    } else {
+      integralHeadingError = 0;
+    }
+    //Calculation of turning motor power
+    double turnMotorPower = (headingError * turning_kP) + (integralHeadingError * turning_kI) + (derivativeHeadingError * turning_kD);
+    //Making motors move
+    double motorsLeftPower = motorPower + turnMotorPower;
+    double motorsRightPower = motorPower - turnMotorPower;
+    //Limiting motor power to max RPM. Gets minimum rpm of +600, then maximum rpm of -600, setting the -600 <= rpm <= 600 limit.
+    motorsLeftPower = fmax(fmin(motorsLeftPower, maxMotorRPM), -maxMotorRPM);
+    motorsRightPower = fmax(fmin(motorsRightPower, maxMotorRPM), -maxMotorRPM);
+    LeftDriveSmart.spin(forward, motorsLeftPower, rpm);
+    RightDriveSmart.spin(forward, motorsRightPower, rpm);
+    //Sets previous robot position vector to current robot position vector. Cos and sin in radians because that is what they take as arguments.
+    //Getting the sin and cos is like polar coordinates where distance travelled is the radius and robot heading is the angle. 
+    //(x,y) == (Rcos(theta),Rsin(theta))
+    robotPosition[0] += distanceTravelled * cos(robotHeading * PI / 180);
+    robotPosition[1] += distanceTravelled * sin(robotHeading * PI / 180);
+    robotPosition[2] = robotHeading;
+    if (fabs(robotPosition[0] - x_value) < 0.1 && fabs(robotPosition[1] - y_value) < 0.1 && fabs(robotPosition[2] - heading_value) < 1.0) {
+      LeftDriveSmart.stop();
+      RightDriveSmart.stop();
+      enableDrivePID = false; //disables PID when target is reached
+    }
+    //Sets prevError to current error
+    prevDistanceError = distanceError;
+    prevHeadingError = headingError;
+    return 1;  // doesn't matter what it returns
+    vex::task::sleep(20); //waits 20 milliseconds before next loop
   return 2; // doesn't matter what it returns
 }
 
@@ -252,8 +302,8 @@ void preAutonomous(void) {
   rotational.resetPosition(); //resetting the rotational sensor position to 0
   //calibrating the inertial sensor MUST DO THIS
   inertialSensor.calibrate(); //in this version inertial var isn't here but assuming it is.
-  while(inertialSensor.isCalibrating()){
-    wait(100, msec);
+  while(inertialSensor.isCalibrating() == true) {
+    wait(20, msec);
   }
 }
 
@@ -280,7 +330,7 @@ bool scraperState = true;
 
 //following codes are for input purpose, if there are some bugs exist, 
 //then put the codes back to userc=Control
-void input(){
+void input() {
   if(Controller1.ButtonR2.pressing() == true){
     IntakeMotor.spin(forward);
     Second_IM.spin(forward);
@@ -311,7 +361,8 @@ void input(){
       scraper.set(true);
     }
   }
-}//trrestrest
+}
+//trrestrest
 
 event Input;
 
