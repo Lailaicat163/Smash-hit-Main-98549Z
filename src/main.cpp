@@ -310,9 +310,6 @@ void preAutonomous(void) {
   rotational.resetPosition(); //resetting the rotational sensor position to 0
   //calibrating the inertial sensor MUST DO THIS
   inertialSensor.calibrate(); //in this version inertial var isn't here but assuming it is.
-  while(inertialSensor.isCalibrating() == true) {
-    wait(20, msec);
-  }
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
   }
@@ -320,7 +317,6 @@ void preAutonomous(void) {
 
 void autonomous(void) {
   Drivetrain.setDriveVelocity(100, percent);
-  Brain.Screen.clearScreen();
   Brain.Screen.print("autonomous code");
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
@@ -332,12 +328,12 @@ void autonomous(void) {
   
   // Call PID directly - it will loop internally
   drivePID(87.5, 22.5, 0);
+  enableDrivePID = true;
   
   // When it finishes, continue to next movement
   // resetPID_Sensors = true;
   // enableDrivePID = true;
   // drivePID(nextX, nextY, nextHeading);
-  resetPID_Sensors = true;
   // while (robotPosition[0] != 150 and robotPosition[1] != 90 and robotPosition[2] != 50) {
   //   drivePID(150, 90, 50);
   // }
