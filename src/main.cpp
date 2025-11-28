@@ -356,16 +356,20 @@ void input() {
   else{
     UpperMotor.stop();
   }
-  if (Controller1.ButtonA.pressing() == true){
-    wait(10, msec);
+  
+}
+void Scraper(){
+    // wait(10, msec);
     if (scraperState == true){
       scraper.set(false);
+      scraperState = false;
     }
     else{
       scraper.set(true);
+      scraperState = true;
     }
   }
-}
+
 //trrestrest
 
 event Input;
@@ -380,6 +384,7 @@ void userControl(void) {
   while(true){
     enableDrivePID = false; //disables PID control during user control
     wait(10, msec);
+    Controller1.ButtonA.pressed(Scraper);
     input();
   }  
 }
