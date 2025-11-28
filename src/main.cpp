@@ -12,6 +12,8 @@
 
 using namespace vex;
 
+#define PI 3.1415926535897
+
 // Brain should be defined by default
 brain Brain;
 
@@ -156,32 +158,32 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 //Start PID FUNCTIONS AND AUTO CODE
 //////////////////////////////////////////////
 //Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to start change position.
-double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
-//double robotPosiition[3] = {67.5, 17.5, 90};  //left side of the field
+static double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
+//static double robotPosiition[3] = {67.5, 17.5, 90};  //left side of the field
 
 //PID Settings; Tweak these values to tune PID.
 //For going straight
-double kP = 0;
-double kI = 0;
-double kD = 0;
+const double kP = 0;
+const double kI = 0;
+const double kD = 0;
 
 //For turning
-double turning_kP = 0;
-double turning_kI = 0;
-double turning_kD = 0;
+const double turning_kP = 0;
+const double turning_kI = 0;
+const double turning_kD = 0;
 
 //Initializing other variables for PID. These will be changed by the function, not the user.
 //distance errors
-double distanceError; //Current value - desired value: Positional Value
-double prevDistanceError = 0; //Positional Value 20 milliseconds ago
-double derivativeDistanceError; //error - prevError: Speed Value
-double integralDistanceError = 0; //Total error = total error + error
+static double distanceError; //Current value - desired value: Positional Value
+static double prevDistanceError = 0; //Positional Value 20 milliseconds ago
+static double derivativeDistanceError; //error - prevError: Speed Value
+static double integralDistanceError = 0; //Total error = total error + error
 
 //Turning errors
-double headingError; //Current value - desired value: Positional Value
-double prevHeadingError = 0; //Positional Value 20 milliseconds ago
-double derivativeHeadingError; //error - prevError: Speed Value
-double integralHeadingError = 0; //Total error = total error + error
+static double headingError; //Current value - desired value: Positional Value
+static double prevHeadingError = 0; //Positional Value 20 milliseconds ago
+static double derivativeHeadingError; //error - prevError: Speed Value
+static double integralHeadingError = 0; //Total error = total error + error
 //PID settings end
 
 //Variables modified for use
@@ -190,7 +192,7 @@ bool enableDrivePID = false;
 
 //NOT DONE THE PID FUNCTION PLZ DON'T TOUCH
 //PID FUNCTION STARTS HERE
-int drivePID(double x_value, double, double heading_value) {
+int drivePID(double x_value, double y_value, double heading_value) {
   while(enableDrivePID) {
     if (resetPID_Sensors == true) {
       //Resets the sensors and variables
@@ -206,8 +208,16 @@ int drivePID(double x_value, double, double heading_value) {
       resetPID_Sensors = false;
     }
     //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
-    //double distanceTravelled = fabs(rotational.position(deg)) * math.pi / 180 * 1.375;  //1.375 is radius of wheel in inches
-
+    double distanceTravelled = fabs(rotational.position(deg)) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
+    double robotHeading = inertialSensor.heading(); //in degrees
+    //Calculates target values for distance
+    static double targetDistance = sqrt( pow(x_value - robotPosition[0], 2) + pow(y_value - robotPosition[1], 2) );
+    distanceError = targetDistance - distanceTravelled;
+    //Derivative and integral error calculations MAY BE CHANGED LATER INTO ABS VALUE
+    derivativeDistanceError = distanceError - prevDistanceError;
+    integralDistanceError += distanceError;
+    //Calculation of motor power
+    double motorPower = (distanceError * kP) + (integralDistanceError * kI) + (derivativeDistanceError * kD);
   }
 
   return 2; // doesn't matter what it returns
