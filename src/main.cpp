@@ -190,9 +190,13 @@ static double integralHeadingError = 0; //Total error = total error + error
 bool resetPID_Sensors = false;
 bool enableDrivePID = false;
 
+//Variables for desired location
+double x_value;
+double y_value;
+double heading_value;
 //NOT DONE THE PID FUNCTION PLZ DON'T TOUCH
 //PID FUNCTION STARTS HERE
-int drivePID(double x_value, double y_value, double heading_value) {
+int drivePID() {
   while(enableDrivePID) {
     if (resetPID_Sensors == true) {
       //Resets the sensors and variables
@@ -263,7 +267,8 @@ int drivePID(double x_value, double y_value, double heading_value) {
     if (fabs(robotPosition[0] - x_value) < 0.1 && fabs(robotPosition[1] - y_value) < 0.1 && fabs(robotPosition[2] - heading_value) < 1.0) {
       LeftDriveSmart.stop();
       RightDriveSmart.stop();
-      enableDrivePID = false; //disables PID when target is reached
+      resetPID_Sensors = true; //resets sensors when target reached
+      return 0; //exits the function and TASK
     }
     //Sets prevError to current error
     prevDistanceError = distanceError;
@@ -278,66 +283,7 @@ int drivePID(double x_value, double y_value, double heading_value) {
     Brain.Screen.print("Position: %.1f, %.1f", robotPosition[0], robotPosition[1]);
     vex::task::sleep(20); //waits 20 milliseconds before next loop
   }
-  return 0; // doesn't matter what it returns
-}
-
-
-#pragma endregion VEXcode Generated Robot Configuration
-
-// ----------------------------------------------------------------------------
-//                                                                            
-//    Project:                                               
-//    Author:
-//    Created:
-//    Configuration:        
-//                                                                            
-// ----------------------------------------------------------------------------
-
-// Include the V5 Library
-#include "vex.h"
-#include <iostream>
-// Allows for easier use of the VEX Library
-using namespace vex;
-
-// Begin project code
-
-void preAutonomous(void) {
-  // actions to do when the program starts
-  Brain.Screen.clearScreen();
-  Brain.Screen.print("pre auton code");
-  wait(1, seconds);
-  Drivetrain.setDriveVelocity(100, percent);
-  rotational.resetPosition(); //resetting the rotational sensor position to 0
-  //calibrating the inertial sensor MUST DO THIS
-  inertialSensor.calibrate(); //in this version inertial var isn't here but assuming it is.
-  if (inertialSensor.isCalibrating() == false) {
-    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-  }
-}
-
-void autonomous(void) {
-  Drivetrain.setDriveVelocity(100, percent);
-  Brain.Screen.print("autonomous code");
-  IntakeMotor.setVelocity(100, percent);
-  UpperMotor.setVelocity(100, percent);
-  Second_IM.setVelocity(100, percent);
-  // place automonous code here
-  // Start PID control
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  
-  // Call PID directly - it will loop internally
-  drivePID(87.5, 22.5, 0);
-  enableDrivePID = true;
-  
-  // When it finishes, continue to next movement
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // drivePID(nextX, nextY, nextHeading);
-  // while (robotPosition[0] != 150 and robotPosition[1] != 90 and robotPosition[2] != 50) {
-  //   drivePID(150, 90, 50);
-  // }
-  // resetPID_Sensors = true;
+  return 1; //Doesn't matter what this returns
 }
 
 bool scraperState = false;
@@ -383,6 +329,69 @@ void Scraper(){
 //trrestrest
 
 event Input;
+
+
+
+#pragma endregion VEXcode Generated Robot Configuration
+
+// ----------------------------------------------------------------------------
+//                                                                            
+//    Project:                                               
+//    Author:
+//    Created:
+//    Configuration:        
+//                                                                            
+// ----------------------------------------------------------------------------
+
+// Include the V5 Library
+#include "vex.h"
+#include <iostream>
+// Allows for easier use of the VEX Library
+using namespace vex;
+
+// Begin project code
+
+void preAutonomous(void) {
+  // actions to do when the program starts
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("pre auton code");
+  wait(1, seconds);
+  Drivetrain.setDriveVelocity(100, percent);
+  rotational.resetPosition(); //resetting the rotational sensor position to 0
+  //calibrating the inertial sensor MUST DO THIS
+  inertialSensor.calibrate(); //in this version inertial var isn't here but assuming it is.
+  if (inertialSensor.isCalibrating() == false) {
+    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+  }
+}
+
+void autonomous(void) {
+  Drivetrain.setDriveVelocity(100, percent);
+  Brain.Screen.print("autonomous code");
+  IntakeMotor.setVelocity(100, percent);
+  UpperMotor.setVelocity(100, percent);
+  Second_IM.setVelocity(100, percent);
+  // place automonous code here
+  // Start PID control
+  resetPID_Sensors = true;
+  enableDrivePID = true;
+  vex::task myTask(drivePID); 
+  //Set desired location moves forward 5 inch and left 90 deg.
+  x_value = 87.5;
+  y_value = 22.5;
+  heading_value = 0;
+  //Starts moving intake while driving forward
+
+
+  // When it finishes, continue to next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // drivePID(nextX, nextY, nextHeading);
+  // while (robotPosition[0] != 150 and robotPosition[1] != 90 and robotPosition[2] != 50) {
+  //   drivePID(150, 90, 50);
+  // }
+  // resetPID_Sensors = true;
+}
 
 void userControl(void) {
   LeftDriveSmart.setStopping(brake);
