@@ -163,7 +163,7 @@ static double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
 
 //PID Settings; Tweak these values to tune PID.
 //For going straight
-const double kP = 0.07;
+const double kP = 0.7;
 const double kI = 0;
 const double kD = 0;
 
