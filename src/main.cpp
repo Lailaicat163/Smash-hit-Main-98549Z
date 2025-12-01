@@ -163,12 +163,12 @@ static double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
 
 //PID Settings; Tweak these values to tune PID.
 //For going straight
-const double kP = 0.7;
+const double kP = 0;
 const double kI = 0;
 const double kD = 0;
 
 //For turning
-const double turning_kP = 0.5;
+const double turning_kP = 0.35;
 const double turning_kI = 0;
 const double turning_kD = 0;
 
@@ -360,9 +360,6 @@ void preAutonomous(void) {
   rotational.resetPosition(); //resetting the rotational sensor position to 0
   //calibrating the inertial sensor MUST DO THIS
   inertialSensor.calibrate(); //in this version inertial var isn't here but assuming it is.
-  if (inertialSensor.isCalibrating() == false) {
-    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-  }
 }
 
 void autonomous(void) {
@@ -371,6 +368,9 @@ void autonomous(void) {
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
+  if (inertialSensor.isCalibrating() == false) {
+    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+  }
   /* Desired locations for autonomous: Autonomous explaination
   Right side start autonomous: 
   1. Move to group of 3 ball location
@@ -406,7 +406,7 @@ void autonomous(void) {
   //Set desired location moves forward 5 inch and left 90 deg.
   x_value = 87.5;
   y_value = 17.5;
-  heading_value = 0;
+  heading_value = 90;
   //Starts moving intake while driving forward
   IntakeMotor.spin(forward);
 
