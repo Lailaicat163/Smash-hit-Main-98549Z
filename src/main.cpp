@@ -371,7 +371,34 @@ void autonomous(void) {
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
+  /* Desired locations for autonomous: Autonomous explaination
+  Right side start autonomous: 
+  1. Move to group of 3 ball location
+  2. Intake
+  3. turn left to middle goal
+  4. outtake
+  5. move in front of match load
+  6. initiate scraper
+  7. move into match load and intake only red balls
+  8. move back
+  9. turn to face long goal
+  10. move forward
+  11. outtake
+  Left side start autonomous: 
+  1. Move to group of 3 ball location
+  2. Intake
+  3. turn right to middle goal
+  4. outtake
+  5. move in front of match load
+  6. initiate scraper
+  7. move into match load and intake only red balls
+  8. move back
+  9. turn to face long goal
+  10. move forward
+  11. outtake
+  */
   // place automonous code here
+  //TEST THE PID AND MULTITASKING TOMORROW
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
@@ -381,7 +408,7 @@ void autonomous(void) {
   y_value = 22.5;
   heading_value = 0;
   //Starts moving intake while driving forward
-
+  IntakeMotor.spin(forward);
 
   // When it finishes, continue to next movement
   // resetPID_Sensors = true;
