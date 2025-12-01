@@ -405,7 +405,7 @@ void autonomous(void) {
   vex::task myTask(drivePID); 
   //Set desired location moves forward 5 inch and left 90 deg.
   x_value = 87.5;
-  y_value = 22.5;
+  y_value = 17.5;
   heading_value = 0;
   //Starts moving intake while driving forward
   IntakeMotor.spin(forward);
