@@ -30,13 +30,13 @@ brain Brain;
 
 
 // Robot configuration code.
-motor leftMotorA = motor(PORT1, ratio18_1, false);
-motor leftMotorB = motor(PORT2, ratio18_1, false);
-motor leftMotorC = motor(PORT3, ratio18_1, false);
+motor leftMotorA = motor(PORT1, ratio6_1, false);
+motor leftMotorB = motor(PORT2, ratio6_1, false);
+motor leftMotorC = motor(PORT3, ratio6_1, false);
 motor_group LeftDriveSmart = motor_group(leftMotorA, leftMotorB, leftMotorC);
-motor rightMotorA = motor(PORT4, ratio18_1, true);
-motor rightMotorB = motor(PORT5, ratio18_1, true);
-motor rightMotorC = motor(PORT6, ratio18_1, true);
+motor rightMotorA = motor(PORT4, ratio6_1, true);
+motor rightMotorB = motor(PORT5, ratio6_1, true);
+motor rightMotorC = motor(PORT6, ratio6_1, true);
 motor_group RightDriveSmart = motor_group(rightMotorA, rightMotorB, rightMotorC);
 drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.7, 190.5, mm, 1);
 
@@ -158,7 +158,7 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 //Start PID FUNCTIONS AND AUTO CODE
 //////////////////////////////////////////////
 //Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to start change position.
-static double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
+double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
 //static double robotPosiition[3] = {67.5, 17.5, 90};  //left side of the field
 
 //PID Settings; Tweak these values to tune PID.
@@ -168,22 +168,22 @@ const double kI = 0;
 const double kD = 0;
 
 //For turning
-const double turning_kP = 0.35;
+const double turning_kP = 0.3;
 const double turning_kI = 0;
 const double turning_kD = 0;
 
 //Initializing other variables for PID. These will be changed by the function, not the user.
 //distance errors
-static double distanceError; //Current value - desired value: Positional Value
-static double prevDistanceError = 0; //Positional Value 20 milliseconds ago
-static double derivativeDistanceError; //error - prevError: Speed Value
-static double integralDistanceError = 0; //Total error = total error + error
+double distanceError; //Current value - desired value: Positional Value
+double prevDistanceError = 0; //Positional Value 20 milliseconds ago
+double derivativeDistanceError; //error - prevError: Speed Value
+double integralDistanceError = 0; //Total error = total error + error
 
 //Turning errors
-static double headingError; //Current value - desired value: Positional Value
-static double prevHeadingError = 0; //Positional Value 20 milliseconds ago
-static double derivativeHeadingError; //error - prevError: Speed Value
-static double integralHeadingError = 0; //Total error = total error + error
+double headingError; //Current value - desired value: Positional Value
+double prevHeadingError = 0; //Positional Value 20 milliseconds ago
+double derivativeHeadingError; //error - prevError: Speed Value
+double integralHeadingError = 0; //Total error = total error + error
 //PID settings end
 
 //Variables modified for use
@@ -228,21 +228,27 @@ int drivePID() {
     //Calculation of motor power
     double motorPower = (distanceError * kP) + (integralDistanceError * kI) + (derivativeDistanceError * kD);
     //end forward movement error calculations
-    //START Angular movement calculations
+    // START Angular movement calculations
     double headingError = heading_value - robotHeading + 540.0;
 
-    // Use fmod for floating-point modulo. modulo is the remainder after division
     headingError = fmod(headingError, 360.0);
-    // Ensures positive result.
+
     if (headingError < 0) {
       headingError += 360.0;
     }
-    //This sets the calculations in range of -180 to 180 degrees
+
     if (headingError > 180.0) {
-    headingError -= 360.0;
+      headingError -= 360.0;
     }
-    //Derivative and integral error calculations MAY BE CHANGED LATER INTO ABS VALUE
-    derivativeHeadingError = headingError - prevHeadingError;
+
+    // Derivative
+    double diff = headingError - prevHeadingError;
+
+    // Normalize derivative wrap
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+
+    derivativeHeadingError = diff;  // or diff/dt
     if (fabs(headingError) < 15) { //integral windup prevention. makes it so that integral only adds up when close to target
       integralHeadingError += headingError;
     } else {
@@ -264,24 +270,17 @@ int drivePID() {
     robotPosition[0] += distanceTravelled * cos(robotHeading * PI / 180);
     robotPosition[1] += distanceTravelled * sin(robotHeading * PI / 180);
     robotPosition[2] = robotHeading;
-    if (fabs(robotPosition[0] - x_value) < 0.1 && fabs(robotPosition[1] - y_value) < 0.1 && fabs(robotPosition[2] - heading_value) < 1.0) {
+    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(robotPosition[2] - heading_value) < 3) {
       LeftDriveSmart.stop();
       RightDriveSmart.stop();
       resetPID_Sensors = true; //resets sensors when target reached
+      enableDrivePID = false;  //disables PID when target reached
       return 0; //exits the function and TASK
     }
     //Sets prevError to current error
     prevDistanceError = distanceError;
     prevHeadingError = headingError;
-    //Debugging info on screen
-    Brain.Screen.clearScreen();
-    Brain.Screen.setCursor(1, 1);
-    Brain.Screen.print("Dist Error: %.2f", distanceError);
-    Brain.Screen.setCursor(2, 1);
-    Brain.Screen.print("Motor Power: %.2f", motorPower);
-    Brain.Screen.setCursor(3, 1);
-    Brain.Screen.print("Position: %.1f, %.1f", robotPosition[0], robotPosition[1]);
-    vex::task::sleep(20); //waits 20 milliseconds before next loop
+    vex::task::sleep(10); //waits 20 milliseconds before next loop
   }
   return 1; //Doesn't matter what this returns
 }
@@ -359,7 +358,7 @@ void preAutonomous(void) {
   Drivetrain.setDriveVelocity(100, percent);
   rotational.resetPosition(); //resetting the rotational sensor position to 0
   //calibrating the inertial sensor MUST DO THIS
-  inertialSensor.calibrate(); //in this version inertial var isn't here but assuming it is.
+  inertialSensor.calibrate(); 
 }
 
 void autonomous(void) {
@@ -371,6 +370,7 @@ void autonomous(void) {
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
   }
+  inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
   /* Desired locations for autonomous: Autonomous explaination
   Right side start autonomous: 
   1. Move to group of 3 ball location
@@ -406,9 +406,9 @@ void autonomous(void) {
   //Set desired location moves forward 5 inch and left 90 deg.
   x_value = 87.5;
   y_value = 17.5;
-  heading_value = 90;
+  heading_value = 180;
   //Starts moving intake while driving forward
-  IntakeMotor.spin(forward);
+  // IntakeMotor.spin(forward);
 
   // When it finishes, continue to next movement
   // resetPID_Sensors = true;
