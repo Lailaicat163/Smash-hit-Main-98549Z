@@ -39,7 +39,7 @@ motor rightMotorB = motor(PORT5, ratio6_1, true);
 motor rightMotorC = motor(PORT6, ratio6_1, true);
 motor_group RightDriveSmart = motor_group(rightMotorA, rightMotorB, rightMotorC);
 drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.7, 190.5, mm, 1);
-
+   
 controller Controller1 = controller(primary);
 
 motor IntakeMotor = motor(PORT12, ratio36_1, true);
@@ -256,7 +256,7 @@ int drivePID() {
     robotPosition[0] += distanceTravelled * cos(robotHeading * PI / 180);
     robotPosition[1] += distanceTravelled * sin(robotHeading * PI / 180);
     robotPosition[2] = robotHeading;
-    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(headingError) < 3) {
+    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(headingError) < 360) {
       LeftDriveSmart.setStopping(brake);
       RightDriveSmart.setStopping(brake);
       LeftDriveSmart.stop();
@@ -393,11 +393,12 @@ void autonomous(void) {
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
-  vex::task myTask(drivePID); 
+  vex::task drivePID_Task(drivePID); 
   //Set desired location moves forward 5 inch and left 90 deg.
   x_value = 87.5;
   y_value = 17.5;
   heading_value = 180;
+  waitUntil(!enableDrivePID); //waits until PID is done
   //Starts moving intake while driving forward
   // IntakeMotor.spin(forward);
 
@@ -418,6 +419,8 @@ void userControl(void) {
   IntakeMotor.setVelocity(100, percent);
   Controller1.ButtonA.pressed(Scraper);
   // place driver control in this while loop
+  scraperState = true;
+  scraper.set(true);
   
   while(true){
     enableDrivePID = false; //disables PID control during user control
