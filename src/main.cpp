@@ -42,9 +42,9 @@ drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.
 
 controller Controller1 = controller(primary);
 
-motor IntakeMotor = motor(PORT12, ratio18_1, true);
+motor IntakeMotor = motor(PORT12, ratio36_1, true);
 motor UpperMotor = motor(PORT13, ratio36_1, true);
-motor Second_IM = motor(PORT14, ratio18_1, true);
+motor Second_IM = motor(PORT14, ratio36_1, true);
 
 //Pneumatic A is for the scraper mechanism
 digital_out scraper = digital_out(Brain.ThreeWirePort.A);
@@ -57,7 +57,7 @@ inertial inertialSensor = inertial(PORT19);
 
 
 //sets max rpm of motors
-const float maxMotorRPM = 600.0;
+const float maxMotorPercentage = 100.0;
 
 // controller Controller2 = controller(partner);
 
@@ -168,9 +168,9 @@ const double kI = 0;
 const double kD = 0;
 
 //For turning
-const double turning_kP = 0.3;
+const double turning_kP = 0.03; //less than .1
 const double turning_kI = 0;
-const double turning_kD = 0;
+const double turning_kD = 0.09; //less than .05 usually
 
 //Initializing other variables for PID. These will be changed by the function, not the user.
 //distance errors
@@ -229,26 +229,12 @@ int drivePID() {
     double motorPower = (distanceError * kP) + (integralDistanceError * kI) + (derivativeDistanceError * kD);
     //end forward movement error calculations
     // START Angular movement calculations
-    double headingError = heading_value - robotHeading + 540.0;
-
-    headingError = fmod(headingError, 360.0);
-
-    if (headingError < 0) {
-      headingError += 360.0;
-    }
-
-    if (headingError > 180.0) {
-      headingError -= 360.0;
-    }
+    double headingError = heading_value - robotHeading;
+    headingError = atan2(sin(headingError * PI /180), cos(headingError * PI / 180)) * 180.0 / PI;
 
     // Derivative
-    double diff = headingError - prevHeadingError;
+    double derivativeHeadingError = headingError - prevHeadingError;
 
-    // Normalize derivative wrap
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-
-    derivativeHeadingError = diff;  // or diff/dt
     if (fabs(headingError) < 15) { //integral windup prevention. makes it so that integral only adds up when close to target
       integralHeadingError += headingError;
     } else {
@@ -259,18 +245,20 @@ int drivePID() {
     //Making motors move
     double motorsLeftPower = motorPower + turnMotorPower;
     double motorsRightPower = motorPower - turnMotorPower;
-    //Limiting motor power to max RPM. Gets minimum rpm of +600, then maximum rpm of -600, setting the -600 <= rpm <= 600 limit.
-    motorsLeftPower = fmax(fmin(motorsLeftPower, maxMotorRPM), -maxMotorRPM);
-    motorsRightPower = fmax(fmin(motorsRightPower, maxMotorRPM), -maxMotorRPM);
-    LeftDriveSmart.spin(forward, motorsLeftPower, rpm);
-    RightDriveSmart.spin(forward, motorsRightPower, rpm);
+    //Limiting motor power to max Percentage. Gets minimum rpm of +100, then maximum rpm of -100, setting the -100 <= percentage <= 100 limit.
+    motorsLeftPower = fmax(fmin(motorsLeftPower, maxMotorPercentage), -maxMotorPercentage);
+    motorsRightPower = fmax(fmin(motorsRightPower, maxMotorPercentage), -maxMotorPercentage);
+    LeftDriveSmart.spin(forward, motorsLeftPower, percent);
+    RightDriveSmart.spin(forward, motorsRightPower, percent);
     //Sets previous robot position vector to current robot position vector. Cos and sin in radians because that is what they take as arguments.
     //Getting the sin and cos is like polar coordinates where distance travelled is the radius and robot heading is the angle. 
     //(x,y) == (Rcos(theta),Rsin(theta))
     robotPosition[0] += distanceTravelled * cos(robotHeading * PI / 180);
     robotPosition[1] += distanceTravelled * sin(robotHeading * PI / 180);
     robotPosition[2] = robotHeading;
-    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(robotPosition[2] - heading_value) < 3) {
+    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(headingError) < 3) {
+      LeftDriveSmart.setStopping(brake);
+      RightDriveSmart.setStopping(brake);
       LeftDriveSmart.stop();
       RightDriveSmart.stop();
       resetPID_Sensors = true; //resets sensors when target reached
@@ -280,7 +268,7 @@ int drivePID() {
     //Sets prevError to current error
     prevDistanceError = distanceError;
     prevHeadingError = headingError;
-    vex::task::sleep(10); //waits 20 milliseconds before next loop
+    vex::task::sleep(20); //waits 20 milliseconds before next loop
   }
   return 1; //Doesn't matter what this returns
 }
@@ -367,6 +355,9 @@ void autonomous(void) {
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
+  LeftDriveSmart.setStopping(brake);
+  RightDriveSmart.setStopping(brake);
+  IntakeMotor.setStopping(brake);
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
   }
