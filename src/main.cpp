@@ -197,7 +197,7 @@ double heading_value;
 //NOT DONE THE PID FUNCTION PLZ DON'T TOUCH
 //PID FUNCTION STARTS HERE
 int drivePID() {
-  while(enableDrivePID) {
+  while(enableDrivePID == true) {
     if (resetPID_Sensors == true) {
       //Resets the sensors and variables
       rotational.resetPosition();
@@ -261,10 +261,11 @@ int drivePID() {
     //Sets previous robot position vector to current robot position vector. Cos and sin in radians because that is what they take as arguments.
     //Getting the sin and cos is like polar coordinates where distance travelled is the radius and robot heading is the angle. 
     //(x,y) == (Rcos(theta),Rsin(theta))
-    robotPosition[0] += distanceTravelled * cos(robotHeading * PI / 180);
-    robotPosition[1] += distanceTravelled * sin(robotHeading * PI / 180);
+    double deltaDistanceTravelled =  distanceTravelled;
+    robotPosition[0] += deltaDistanceTravelled * cos(robotHeading * PI / 180);
+    robotPosition[1] += deltaDistanceTravelled * sin(robotHeading * PI / 180);
     robotPosition[2] = robotHeading;
-    if (fabs(robotPosition[0] - x_value) < 0.1 && fabs(robotPosition[1] - y_value) < 0.1 && fabs(robotPosition[2] - heading_value) < 1.0) {
+    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(robotPosition[2] - heading_value) < 3) {
       LeftDriveSmart.stop();
       RightDriveSmart.stop();
       resetPID_Sensors = true; //resets sensors when target reached
@@ -355,7 +356,6 @@ void preAutonomous(void) {
   // actions to do when the program starts
   Brain.Screen.clearScreen();
   Brain.Screen.print("pre auton code");
-  wait(1, seconds);
   Drivetrain.setDriveVelocity(100, percent);
   rotational.resetPosition(); //resetting the rotational sensor position to 0
   //calibrating the inertial sensor MUST DO THIS
@@ -402,11 +402,11 @@ void autonomous(void) {
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
-  vex::task myTask(drivePID); 
   //Set desired location moves forward 5 inch and left 90 deg.
   x_value = 87.5;
   y_value = 17.5;
-  heading_value = 0;
+  heading_value = 45;
+  vex::task myTask(drivePID); 
   //Starts moving intake while driving forward
   IntakeMotor.spin(forward);
 
