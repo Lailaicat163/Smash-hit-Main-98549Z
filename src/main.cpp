@@ -48,6 +48,7 @@ motor Second_IM = motor(PORT14, ratio36_1, true);
 
 //Pneumatic A is for the scraper mechanism
 digital_out scraper = digital_out(Brain.ThreeWirePort.A);
+digital_out descore = digital_out(Brain.ThreeWirePort.H);
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
 rotation rotational = rotation(PORT17, false);
@@ -256,7 +257,7 @@ int drivePID() {
     robotPosition[0] += distanceTravelled * cos(robotHeading * PI / 180);
     robotPosition[1] += distanceTravelled * sin(robotHeading * PI / 180);
     robotPosition[2] = robotHeading;
-    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(headingError) < 360) {
+    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(headingError) < 3) {
       LeftDriveSmart.setStopping(brake);
       RightDriveSmart.setStopping(brake);
       LeftDriveSmart.stop();
@@ -313,6 +314,20 @@ void Scraper(){
     }
   }
 
+bool DescoreState = false;
+
+void Descore(){
+  if (DescoreState == true){
+    descore.set(false);
+    DescoreState = false;
+  }
+  else{
+    descore.set(true);
+    DescoreState = true;
+  }
+  
+}
+
 //trrestrest
 
 event Input;
@@ -365,10 +380,10 @@ void autonomous(void) {
   scraperState = true;
   scraper.set(true);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-  Drivetrain.driveFor(forward, 55, inches);
+  // Drivetrain.driveFor(forward, 55, inches);
   // Autonomous drivetrain has a bug where it will reverse the direction you input.
   // you will need to reverse your action.
-  Drivetrain.turnFor(left, 45, degrees);
+  // Drivetrain.turnFor(left, 45, degrees);
   /* Desired locations for autonomous: Autonomous explaination
   Right side start autonomous: 
   1. Move to group of 3 ball location
@@ -396,7 +411,6 @@ void autonomous(void) {
   11. outtake
   */
   // place automonous code here
-  //TEST THE PID AND MULTITASKING TOMORROW
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
@@ -425,6 +439,7 @@ void userControl(void) {
   IntakeMotor.setStopping(brake);
   IntakeMotor.setVelocity(100, percent);
   Controller1.ButtonA.pressed(Scraper);
+  Controller1.ButtonB.pressed(Descore);
   // place driver control in this while loop
   
   
