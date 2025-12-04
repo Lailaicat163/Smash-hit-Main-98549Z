@@ -168,9 +168,9 @@ const double kI = 0;
 const double kD = 0;
 
 //For turning
-const double turning_kP = 0.03; //less than .1
-const double turning_kI = 0;
-const double turning_kD = 0.09; //less than .05 usually
+const double turning_kP = 0.09; //less than .1
+const double turning_kI = 0.0;
+const double turning_kD = 0.0; //less than .05 usually
 
 //Initializing other variables for PID. These will be changed by the function, not the user.
 //distance errors
@@ -351,6 +351,7 @@ void preAutonomous(void) {
 
 void autonomous(void) {
   Drivetrain.setDriveVelocity(100, percent);
+  Drivetrain.setTurnVelocity(100, percent);
   Brain.Screen.print("autonomous code");
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
@@ -361,7 +362,13 @@ void autonomous(void) {
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
   }
+  scraperState = true;
+  scraper.set(true);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+  Drivetrain.driveFor(forward, 55, inches);
+  // Autonomous drivetrain has a bug where it will reverse the direction you input.
+  // you will need to reverse your action.
+  Drivetrain.turnFor(left, 45, degrees);
   /* Desired locations for autonomous: Autonomous explaination
   Right side start autonomous: 
   1. Move to group of 3 ball location
@@ -419,8 +426,7 @@ void userControl(void) {
   IntakeMotor.setVelocity(100, percent);
   Controller1.ButtonA.pressed(Scraper);
   // place driver control in this while loop
-  scraperState = true;
-  scraper.set(true);
+  
   
   while(true){
     enableDrivePID = false; //disables PID control during user control
