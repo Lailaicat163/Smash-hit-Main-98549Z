@@ -30,21 +30,21 @@ brain Brain;
 
 
 // Robot configuration code.
-motor leftMotorA = motor(PORT1, ratio18_1, false);
-motor leftMotorB = motor(PORT2, ratio18_1, false);
-motor leftMotorC = motor(PORT3, ratio18_1, false);
+motor leftMotorA = motor(PORT1, ratio6_1, false);
+motor leftMotorB = motor(PORT2, ratio6_1, false);
+motor leftMotorC = motor(PORT3, ratio6_1, false);
 motor_group LeftDriveSmart = motor_group(leftMotorA, leftMotorB, leftMotorC);
-motor rightMotorA = motor(PORT4, ratio18_1, true);
-motor rightMotorB = motor(PORT5, ratio18_1, true);
-motor rightMotorC = motor(PORT6, ratio18_1, true);
+motor rightMotorA = motor(PORT4, ratio6_1, true);
+motor rightMotorB = motor(PORT5, ratio6_1, true);
+motor rightMotorC = motor(PORT6, ratio6_1, true);
 motor_group RightDriveSmart = motor_group(rightMotorA, rightMotorB, rightMotorC);
 drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.7, 190.5, mm, 1);
-
+   
 controller Controller1 = controller(primary);
 
-motor IntakeMotor = motor(PORT12, ratio18_1, true);
+motor IntakeMotor = motor(PORT12, ratio36_1, true);
 motor UpperMotor = motor(PORT13, ratio36_1, true);
-motor Second_IM = motor(PORT14, ratio18_1, true);
+motor Second_IM = motor(PORT14, ratio36_1, true);
 
 //Pneumatic A is for the scraper mechanism
 digital_out scraper = digital_out(Brain.ThreeWirePort.A);
@@ -57,7 +57,7 @@ inertial inertialSensor = inertial(PORT19);
 
 
 //sets max rpm of motors
-const float maxMotorRPM = 600.0;
+const float maxMotorPercentage = 100.0;
 
 // controller Controller2 = controller(partner);
 
@@ -158,32 +158,32 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 //Start PID FUNCTIONS AND AUTO CODE
 //////////////////////////////////////////////
 //Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to start change position.
-static double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
+double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
 //static double robotPosiition[3] = {67.5, 17.5, 90};  //left side of the field
 
 //PID Settings; Tweak these values to tune PID.
 //For going straight
-const double kP = 0.7;
+const double kP = 0;
 const double kI = 0;
 const double kD = 0;
 
 //For turning
-const double turning_kP = 0.5;
-const double turning_kI = 0;
-const double turning_kD = 0;
+const double turning_kP = 0.09; //less than .1
+const double turning_kI = 0.0;
+const double turning_kD = 0.0; //less than .05 usually
 
 //Initializing other variables for PID. These will be changed by the function, not the user.
 //distance errors
-static double distanceError; //Current value - desired value: Positional Value
-static double prevDistanceError = 0; //Positional Value 20 milliseconds ago
-static double derivativeDistanceError; //error - prevError: Speed Value
-static double integralDistanceError = 0; //Total error = total error + error
+double distanceError; //Current value - desired value: Positional Value
+double prevDistanceError = 0; //Positional Value 20 milliseconds ago
+double derivativeDistanceError; //error - prevError: Speed Value
+double integralDistanceError = 0; //Total error = total error + error
 
 //Turning errors
-static double headingError; //Current value - desired value: Positional Value
-static double prevHeadingError = 0; //Positional Value 20 milliseconds ago
-static double derivativeHeadingError; //error - prevError: Speed Value
-static double integralHeadingError = 0; //Total error = total error + error
+double headingError; //Current value - desired value: Positional Value
+double prevHeadingError = 0; //Positional Value 20 milliseconds ago
+double derivativeHeadingError; //error - prevError: Speed Value
+double integralHeadingError = 0; //Total error = total error + error
 //PID settings end
 
 //Variables modified for use
@@ -228,21 +228,13 @@ int drivePID() {
     //Calculation of motor power
     double motorPower = (distanceError * kP) + (integralDistanceError * kI) + (derivativeDistanceError * kD);
     //end forward movement error calculations
-    //START Angular movement calculations
-    double headingError = heading_value - robotHeading + 540.0;
+    // START Angular movement calculations
+    double headingError = heading_value - robotHeading;
+    headingError = atan2(sin(headingError * PI /180), cos(headingError * PI / 180)) * 180.0 / PI;
 
-    // Use fmod for floating-point modulo. modulo is the remainder after division
-    headingError = fmod(headingError, 360.0);
-    // Ensures positive result.
-    if (headingError < 0) {
-      headingError += 360.0;
-    }
-    //This sets the calculations in range of -180 to 180 degrees
-    if (headingError > 180.0) {
-    headingError -= 360.0;
-    }
-    //Derivative and integral error calculations MAY BE CHANGED LATER INTO ABS VALUE
-    derivativeHeadingError = headingError - prevHeadingError;
+    // Derivative
+    double derivativeHeadingError = headingError - prevHeadingError;
+
     if (fabs(headingError) < 15) { //integral windup prevention. makes it so that integral only adds up when close to target
       integralHeadingError += headingError;
     } else {
@@ -253,11 +245,11 @@ int drivePID() {
     //Making motors move
     double motorsLeftPower = motorPower + turnMotorPower;
     double motorsRightPower = motorPower - turnMotorPower;
-    //Limiting motor power to max RPM. Gets minimum rpm of +600, then maximum rpm of -600, setting the -600 <= rpm <= 600 limit.
-    motorsLeftPower = fmax(fmin(motorsLeftPower, maxMotorRPM), -maxMotorRPM);
-    motorsRightPower = fmax(fmin(motorsRightPower, maxMotorRPM), -maxMotorRPM);
-    LeftDriveSmart.spin(forward, motorsLeftPower, rpm);
-    RightDriveSmart.spin(forward, motorsRightPower, rpm);
+    //Limiting motor power to max Percentage. Gets minimum rpm of +100, then maximum rpm of -100, setting the -100 <= percentage <= 100 limit.
+    motorsLeftPower = fmax(fmin(motorsLeftPower, maxMotorPercentage), -maxMotorPercentage);
+    motorsRightPower = fmax(fmin(motorsRightPower, maxMotorPercentage), -maxMotorPercentage);
+    LeftDriveSmart.spin(forward, motorsLeftPower, percent);
+    RightDriveSmart.spin(forward, motorsRightPower, percent);
     //Sets previous robot position vector to current robot position vector. Cos and sin in radians because that is what they take as arguments.
     //Getting the sin and cos is like polar coordinates where distance travelled is the radius and robot heading is the angle. 
     //(x,y) == (Rcos(theta),Rsin(theta))
@@ -266,22 +258,18 @@ int drivePID() {
     robotPosition[1] += deltaDistanceTravelled * sin(robotHeading * PI / 180);
     robotPosition[2] = robotHeading;
     if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(robotPosition[2] - heading_value) < 3) {
+    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(headingError) < 360) {
+      LeftDriveSmart.setStopping(brake);
+      RightDriveSmart.setStopping(brake);
       LeftDriveSmart.stop();
       RightDriveSmart.stop();
       resetPID_Sensors = true; //resets sensors when target reached
+      enableDrivePID = false;  //disables PID when target reached
       return 0; //exits the function and TASK
     }
     //Sets prevError to current error
     prevDistanceError = distanceError;
     prevHeadingError = headingError;
-    //Debugging info on screen
-    Brain.Screen.clearScreen();
-    Brain.Screen.setCursor(1, 1);
-    Brain.Screen.print("Dist Error: %.2f", distanceError);
-    Brain.Screen.setCursor(2, 1);
-    Brain.Screen.print("Motor Power: %.2f", motorPower);
-    Brain.Screen.setCursor(3, 1);
-    Brain.Screen.print("Position: %.1f, %.1f", robotPosition[0], robotPosition[1]);
     vex::task::sleep(20); //waits 20 milliseconds before next loop
   }
   return 1; //Doesn't matter what this returns
@@ -359,18 +347,29 @@ void preAutonomous(void) {
   Drivetrain.setDriveVelocity(100, percent);
   rotational.resetPosition(); //resetting the rotational sensor position to 0
   //calibrating the inertial sensor MUST DO THIS
-  inertialSensor.calibrate(); //in this version inertial var isn't here but assuming it is.
-  if (inertialSensor.isCalibrating() == false) {
-    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-  }
+  inertialSensor.calibrate(); 
 }
 
 void autonomous(void) {
   Drivetrain.setDriveVelocity(100, percent);
+  Drivetrain.setTurnVelocity(100, percent);
   Brain.Screen.print("autonomous code");
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
+  LeftDriveSmart.setStopping(brake);
+  RightDriveSmart.setStopping(brake);
+  IntakeMotor.setStopping(brake);
+  if (inertialSensor.isCalibrating() == false) {
+    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+  }
+  scraperState = true;
+  scraper.set(true);
+  inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+  Drivetrain.driveFor(forward, 55, inches);
+  // Autonomous drivetrain has a bug where it will reverse the direction you input.
+  // you will need to reverse your action.
+  Drivetrain.turnFor(left, 45, degrees);
   /* Desired locations for autonomous: Autonomous explaination
   Right side start autonomous: 
   1. Move to group of 3 ball location
@@ -402,13 +401,13 @@ void autonomous(void) {
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
+  vex::task myTask(drivePID); 
   //Set desired location moves forward 5 inch and left 90 deg.
   x_value = 87.5;
   y_value = 17.5;
-  heading_value = 45;
-  vex::task myTask(drivePID); 
+  heading_value = 0;
   //Starts moving intake while driving forward
-  IntakeMotor.spin(forward);
+  // IntakeMotor.spin(forward);
 
   // When it finishes, continue to next movement
   // resetPID_Sensors = true;
@@ -427,6 +426,7 @@ void userControl(void) {
   IntakeMotor.setVelocity(100, percent);
   Controller1.ButtonA.pressed(Scraper);
   // place driver control in this while loop
+  
   
   while(true){
     enableDrivePID = false; //disables PID control during user control
