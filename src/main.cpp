@@ -75,6 +75,8 @@ void initializeRandomSeed(){
   srand(seed);
 }
 
+bool isAutonomous = false;
+bool isDriverControl = false; 
 
 
 void vexcodeInit() {
@@ -159,19 +161,27 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 //Start PID FUNCTIONS AND AUTO CODE
 //////////////////////////////////////////////
 //Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to start change position.
-double robotPosition[3] = {87.5, 17.5, 90};  //right side of the field
-//static double robotPosiition[3] = {67.5, 17.5, 90};  //left side of the field
+//right side tracks from left corner
+double robotPosition[3] = {80.125, 14.5, 90};  //right side of the field
+//left side tracks from left corner
+//static double robotPosiition[3] = {61.25, 14.5, 90};  //left side of the field
 
+/*
+coordinates of left side ball cluster
+48,53
+*/
 //PID Settings; Tweak these values to tune PID.
 //For going straight
-const double kP = 0;
+const double kP = 0.4;
 const double kI = 0;
-const double kD = 0;
+const double kD = 0.;
 
 //For turning
-const double turning_kP = 0.09; //less than .1
-const double turning_kI = 0.0;
-const double turning_kD = 0.0; //less than .05 usually
+//0.09
+const double turning_kP = 0; //less than .1 
+const double turning_kI = 0; //should be a really small number 0.024 example
+//0.05
+const double turning_kD = 0; //less than .05 usually
 
 //Initializing other variables for PID. These will be changed by the function, not the user.
 //distance errors
@@ -191,6 +201,9 @@ double integralHeadingError = 0; //Total error = total error + error
 bool resetPID_Sensors = false;
 bool enableDrivePID = false;
 
+//For delta distance travelled calculation
+double previousDistanceTravelled = 0;
+
 //Variables for desired location
 double x_value;
 double y_value;
@@ -199,6 +212,8 @@ double heading_value;
 //PID FUNCTION STARTS HERE
 int drivePID() {
   while(enableDrivePID == true) {
+    double totalDistanceTravelled = 0;
+    rotational.resetPosition(); //Resets the rotational sensor position to 0 at the start of each loop
     if (resetPID_Sensors == true) {
       //Resets the sensors and variables
       rotational.resetPosition();
@@ -212,13 +227,11 @@ int drivePID() {
       integralHeadingError = 0;
       resetPID_Sensors = false;
     }
-    //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
-    double distanceTravelled = rotational.position(deg) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
     double robotHeading = inertialSensor.heading(); //in degrees
     //Calculates target values for distance
-    double targetDistance = sqrt( pow(x_value - robotPosition[0], 2) + pow(y_value - robotPosition[1], 2) );
+    double targetDistance = sqrt(S pow(x_value - robotPosition[0], 2) + pow(y_value - robotPosition[1], 2) );
     //Forward movement error calculations
-    distanceError = targetDistance - distanceTravelled;
+    distanceError = targetDistance;
     //Derivative and integral error calculations
     derivativeDistanceError = distanceError - prevDistanceError;
     if (fabs(distanceError) < 5) { //integral windup prevention. makes it so that integral only adds up when close to target
@@ -230,7 +243,7 @@ int drivePID() {
     double motorPower = (distanceError * kP) + (integralDistanceError * kI) + (derivativeDistanceError * kD);
     //end forward movement error calculations
     // START Angular movement calculations
-    double headingError = heading_value - robotHeading;
+    headingError = heading_value - robotHeading;
     headingError = atan2(sin(headingError * PI /180), cos(headingError * PI / 180)) * 180.0 / PI;
 
     // Derivative
@@ -254,11 +267,13 @@ int drivePID() {
     //Sets previous robot position vector to current robot position vector. Cos and sin in radians because that is what they take as arguments.
     //Getting the sin and cos is like polar coordinates where distance travelled is the radius and robot heading is the angle. 
     //(x,y) == (Rcos(theta),Rsin(theta))
-    double deltaDistanceTravelled =  distanceTravelled;
-    robotPosition[0] += deltaDistanceTravelled * cos(robotHeading * PI / 180);
-    robotPosition[1] += deltaDistanceTravelled * sin(robotHeading * PI / 180);
+    //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
+    //Delta distance travelled since last reset
+    totalDistanceTravelled = rotational.position(deg) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
+    robotPosition[0] += totalDistanceTravelled * cos(robotHeading * PI / 180);
+    robotPosition[1] += totalDistanceTravelled * sin(robotHeading * PI / 180);
     robotPosition[2] = robotHeading;
-    if (fabs(robotPosition[0] - x_value) < 1 || fabs(robotPosition[1] - y_value) < 1 || fabs(headingError) < 3) {
+    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(headingError) < 3) {
       LeftDriveSmart.setStopping(brake);
       RightDriveSmart.setStopping(brake);
       LeftDriveSmart.stop();
@@ -281,24 +296,33 @@ bool scraperState = false;
 //then put the codes back to userc=Control
 void input() {
   if(Controller1.ButtonR2.pressing() == true){
+    IntakeMotor.setVelocity(100, percent);
+    Second_IM.setVelocity(100, percent);
     IntakeMotor.spin(forward);
     Second_IM.spin(forward);
   }
   else if(Controller1.ButtonR1.pressing() == true){
+    IntakeMotor.setVelocity(50, percent);
+    Second_IM.setVelocity(50, percent);
     IntakeMotor.spin(reverse);
     Second_IM.spin(reverse);
   }
   else{
+    IntakeMotor.setVelocity(100, percent);
+    Second_IM.setVelocity(100, percent);
     IntakeMotor.stop();
     Second_IM.stop();
   }
   if(Controller1.ButtonL1.pressing() == true){
+    UpperMotor.setVelocity(50, percent);
     UpperMotor.spin(reverse);
   }
   else if(Controller1.ButtonL2.pressing() == true){
+    UpperMotor.setVelocity(100, percent);
     UpperMotor.spin(forward);
   }
   else{
+    UpperMotor.setVelocity(100, percent);
     UpperMotor.stop();
   }
   
@@ -365,6 +389,8 @@ void preAutonomous(void) {
 }
 
 void autonomous(void) {
+  isAutonomous = true;
+  isDriverControl = false;
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
   Brain.Screen.print("autonomous code");
@@ -416,8 +442,8 @@ void autonomous(void) {
   enableDrivePID = true;
   vex::task myTask(drivePID); 
   //Set desired location moves forward 5 inch and left 90 deg.
-  x_value = 87.5;
-  y_value = 17.5;
+  x_value = 80.125;
+  y_value = 24.5;
   heading_value = 0;
   //Starts moving intake while driving forward
   // IntakeMotor.spin(forward);
@@ -433,6 +459,8 @@ void autonomous(void) {
 }
 
 void userControl(void) {
+  isAutonomous = false;
+  isDriverControl = true;
   LeftDriveSmart.setStopping(brake);
   RightDriveSmart.setStopping(brake);
   IntakeMotor.setStopping(brake);
@@ -454,8 +482,8 @@ int main() {
   vexcodeInit();
   // create competition instance
   competition Competition;
-  IntakeMotor.setVelocity(75, percent);
-  Second_IM.setVelocity(75, percent);
+  IntakeMotor.setVelocity(100, percent);
+  Second_IM.setVelocity(100, percent);
   
 
   // Set up callbacks for autonomous and driver control periods.
@@ -466,8 +494,15 @@ int main() {
   // Run the pre-autonomous function.
   preAutonomous();
 
+  while (isAutonomous == false && isDriverControl == false) {
+    scraper.set(false);
+    wait(100, msec);
+  }
+
   // Prevent main from exiting with an infinite loop.
   while (true) {
+
     wait(100, msec);
   }
 }
+
