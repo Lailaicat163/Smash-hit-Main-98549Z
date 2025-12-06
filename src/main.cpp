@@ -51,7 +51,7 @@ digital_out scraper = digital_out(Brain.ThreeWirePort.A);
 digital_out descore = digital_out(Brain.ThreeWirePort.H);
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
-rotation rotational = rotation(PORT17, false);
+rotation rotational = rotation(PORT17, true);
 
 //Initializes the inertial sensor. starts from 0 degrees and increases by turning clockwise.
 inertial inertialSensor = inertial(PORT19);
@@ -162,7 +162,6 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 //////////////////////////////////////////////
 //Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to start change position.
 //right side tracks from left corner
-double robotPosition[3] = {80.125, 14.5, 90};  //right side of the field
 //left side tracks from left corner
 //static double robotPosiition[3] = {61.25, 14.5, 90};  //left side of the field
 
@@ -172,13 +171,13 @@ coordinates of left side ball cluster
 */
 //PID Settings; Tweak these values to tune PID.
 //For going straight
-const double kP = 0.4;
-const double kI = 0;
-const double kD = 0.;
+const double kP = 7;  //7
+const double kI = 0.1;
+const double kD = 5; //2
 
 //For turning
 //0.09
-const double turning_kP = 0; //less than .1 
+const double turning_kP = 0.01; //less than .1 
 const double turning_kI = 0; //should be a really small number 0.024 example
 //0.05
 const double turning_kD = 0; //less than .05 usually
@@ -205,15 +204,17 @@ bool enableDrivePID = false;
 double previousDistanceTravelled = 0;
 
 //Variables for desired location
-double x_value;
-double y_value;
-double heading_value;
+double desiredTurnValue = 0;
+double targetDistance = 0;
+
+double totalDistanceTravelled = 0;
+
+int timerCount = 0;
+
 //NOT DONE THE PID FUNCTION PLZ DON'T TOUCH
 //PID FUNCTION STARTS HERE
 int drivePID() {
   while(enableDrivePID == true) {
-    double totalDistanceTravelled = 0;
-    rotational.resetPosition(); //Resets the rotational sensor position to 0 at the start of each loop
     if (resetPID_Sensors == true) {
       //Resets the sensors and variables
       rotational.resetPosition();
@@ -226,10 +227,11 @@ int drivePID() {
       derivativeHeadingError = 0;
       integralHeadingError = 0;
       resetPID_Sensors = false;
+      previousDistanceTravelled = 0;
+      totalDistanceTravelled = 0;
     }
     double robotHeading = inertialSensor.heading(); //in degrees
     //Calculates target values for distance
-    double targetDistance = sqrt(S pow(x_value - robotPosition[0], 2) + pow(y_value - robotPosition[1], 2) );
     //Forward movement error calculations
     distanceError = targetDistance;
     //Derivative and integral error calculations
@@ -243,7 +245,7 @@ int drivePID() {
     double motorPower = (distanceError * kP) + (integralDistanceError * kI) + (derivativeDistanceError * kD);
     //end forward movement error calculations
     // START Angular movement calculations
-    headingError = heading_value - robotHeading;
+    headingError = desiredTurnValue - robotHeading;
     headingError = atan2(sin(headingError * PI /180), cos(headingError * PI / 180)) * 180.0 / PI;
 
     // Derivative
@@ -270,10 +272,13 @@ int drivePID() {
     //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
     //Delta distance travelled since last reset
     totalDistanceTravelled = rotational.position(deg) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
-    robotPosition[0] += totalDistanceTravelled * cos(robotHeading * PI / 180);
-    robotPosition[1] += totalDistanceTravelled * sin(robotHeading * PI / 180);
-    robotPosition[2] = robotHeading;
-    if (fabs(robotPosition[0] - x_value) < 1 && fabs(robotPosition[1] - y_value) < 1 && fabs(headingError) < 3) {
+    targetDistance = targetDistance - (totalDistanceTravelled - previousDistanceTravelled);
+    if (fabs(targetDistance) < 0.1 && fabs(headingError) < 360 && timerCount < 20) { //If within 1 inches and 3 degree of target, stop motors and exit task
+      timerCount += 1;
+    } else if (fabs(targetDistance) > 0.1 && fabs(headingError) < 360) {
+      timerCount = 0;
+    } else if (timerCount >= 20) {
+      timerCount = 0;
       LeftDriveSmart.setStopping(brake);
       RightDriveSmart.setStopping(brake);
       LeftDriveSmart.stop();
@@ -282,7 +287,10 @@ int drivePID() {
       enableDrivePID = false;  //disables PID when target reached
       return 0; //exits the function and TASK
     }
+      
+  
     //Sets prevError to current error
+    previousDistanceTravelled = totalDistanceTravelled;
     prevDistanceError = distanceError;
     prevHeadingError = headingError;
     vex::task::sleep(20); //waits 20 milliseconds before next loop
@@ -353,6 +361,33 @@ void Descore(){
   
 }
 
+bool NegusConfirmed = false;
+
+void Negus(){
+  if (NegusConfirmed == true){
+    Controller1.Screen.clearLine(1);
+    Controller1.Screen.setCursor(1,1);
+    Controller1.Screen.print("Stopping Robot...");
+    Brain.programStop();
+  }
+  else{
+    Controller1.Screen.clearLine(1);
+    Controller1.Screen.setCursor(1,1);
+    Controller1.Screen.print("Stop robot? Y or X");
+    NegusConfirmed = true;
+  }
+}
+
+void NoNegus(){
+  if (NegusConfirmed == true){
+    Controller1.Screen.clearLine(1);
+    Controller1.Screen.setCursor(1,1);
+    Controller1.Screen.print("Stopping Cancelled!");
+    NegusConfirmed = false;
+    wait(1500, msec);
+    Controller1.Screen.clearLine(1);
+  }
+}
 //trrestrest
 
 event Input;
@@ -388,7 +423,10 @@ void preAutonomous(void) {
   inertialSensor.calibrate(); 
 }
 
+
+
 void autonomous(void) {
+  
   isAutonomous = true;
   isDriverControl = false;
   Drivetrain.setDriveVelocity(100, percent);
@@ -403,6 +441,7 @@ void autonomous(void) {
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
   }
+  Controller1.ButtonX.pressed(Negus);
   scraperState = true;
   scraper.set(true);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
@@ -440,11 +479,12 @@ void autonomous(void) {
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
+  desiredTurnValue = 180;
+  targetDistance = 0; //inches
   vex::task myTask(drivePID); 
+
   //Set desired location moves forward 5 inch and left 90 deg.
-  x_value = 80.125;
-  y_value = 24.5;
-  heading_value = 0;
+
   //Starts moving intake while driving forward
   // IntakeMotor.spin(forward);
 
@@ -459,14 +499,17 @@ void autonomous(void) {
 }
 
 void userControl(void) {
+  Controller1.ButtonA.pressed(Scraper);
+  Controller1.ButtonB.pressed(Descore);
+  Controller1.ButtonX.pressed(Negus);
+  Controller1.ButtonY.pressed(NoNegus);
   isAutonomous = false;
   isDriverControl = true;
   LeftDriveSmart.setStopping(brake);
   RightDriveSmart.setStopping(brake);
   IntakeMotor.setStopping(brake);
   IntakeMotor.setVelocity(100, percent);
-  Controller1.ButtonA.pressed(Scraper);
-  Controller1.ButtonB.pressed(Descore);
+  
   // place driver control in this while loop
   
   
@@ -474,6 +517,9 @@ void userControl(void) {
     enableDrivePID = false; //disables PID control during user control
     wait(10, msec);
     input();
+    while(1==1){
+    Brain.Screen.print(rotational.position(deg));
+    }
   }  
 }
 
