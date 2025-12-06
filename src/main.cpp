@@ -58,7 +58,7 @@ inertial inertialSensor = inertial(PORT19);
 
 
 //sets max rpm of motors
-const float maxMotorPercentage = 100.0;
+float maxMotorPercentage = 100.0;
 
 // controller Controller2 = controller(partner);
 
@@ -177,7 +177,7 @@ const double kD = 5; //2
 
 //For turning
 //0.09
-const double turning_kP = 0.01; //less than .1 
+const double turning_kP = 0.6; //less than .1 
 const double turning_kI = 0; //should be a really small number 0.024 example
 //0.05
 const double turning_kD = 0; //less than .05 usually
@@ -246,8 +246,7 @@ int drivePID() {
     //end forward movement error calculations
     // START Angular movement calculations
     headingError = desiredTurnValue - robotHeading;
-    headingError = atan2(sin(headingError * PI /180), cos(headingError * PI / 180)) * 180.0 / PI;
-
+    headingError = -1 * (atan2(sin(headingError * PI /180), cos(headingError * PI / 180)) * 180.0 / PI);
     // Derivative
     double derivativeHeadingError = headingError - prevHeadingError;
 
@@ -273,9 +272,9 @@ int drivePID() {
     //Delta distance travelled since last reset
     totalDistanceTravelled = rotational.position(deg) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
     targetDistance = targetDistance - (totalDistanceTravelled - previousDistanceTravelled);
-    if (fabs(targetDistance) < 0.1 && fabs(headingError) < 360 && timerCount < 20) { //If within 1 inches and 3 degree of target, stop motors and exit task
+    if (fabs(targetDistance) < 0.1 && fabs(headingError) < 3 && timerCount < 20) { //If within 1 inches and 3 degree of target, stop motors and exit task
       timerCount += 1;
-    } else if (fabs(targetDistance) > 0.1 && fabs(headingError) < 360) {
+    } else if (fabs(targetDistance) > 0.1 && fabs(headingError) < 3) {
       timerCount = 0;
     } else if (timerCount >= 20) {
       timerCount = 0;
@@ -426,7 +425,8 @@ void preAutonomous(void) {
 
 
 void autonomous(void) {
-  
+  //UpperMotor forward goes right, reverse goes left
+  //IntakeMotor and Second_IM forward up, reverse down
   isAutonomous = true;
   isDriverControl = false;
   Drivetrain.setDriveVelocity(100, percent);
@@ -479,15 +479,101 @@ void autonomous(void) {
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
-  desiredTurnValue = 180;
+  desiredTurnValue = 90;
+  targetDistance = 11; //inches
+  vex::task drivePID_Thread(drivePID);
+  while (enableDrivePID == true) {
+    vex::task::sleep(10);
+  }
+  //Next movement
+  resetPID_Sensors = true;
+  enableDrivePID = true;
+  desiredTurnValue = 110;
   targetDistance = 0; //inches
-  vex::task myTask(drivePID); 
+  vex::task drivePID_Thread2(drivePID);
+  while (enableDrivePID == true) {
+    vex::task::sleep(10);
+  }
+  //Next movement
+  maxMotorPercentage = 30;
+  resetPID_Sensors = true;
+  enableDrivePID = true;
+  desiredTurnValue = 110;
+  targetDistance = 19; //inches
+  vex::task drivePID_Thread3(drivePID);
+  IntakeMotor.setVelocity(100, percent);
+  Second_IM.setVelocity(15, percent); 
+  UpperMotor.setVelocity(20, percent);
+  Second_IM.spin(forward);
+  UpperMotor.spin(forward);
+  IntakeMotor.spin(forward);
+  while (enableDrivePID == true) {
+    vex::task::sleep(10);
+  }
+  //Next movement
+  maxMotorPercentage = 100;
+  resetPID_Sensors = true;
+  enableDrivePID = true;
+  desiredTurnValue = 40;
+  targetDistance = 0; //inches
+  vex::task drivePID_Thread4(drivePID);
+  IntakeMotor.stop();
+  Second_IM.stop();
+  UpperMotor.stop();
+  while (enableDrivePID == true) {
+    vex::task::sleep(10);
+  }
+  //Next movement
+  resetPID_Sensors = true;
+  enableDrivePID = true;
+  desiredTurnValue = 40;
+  targetDistance = 14; //inches
+  vex::task drivePID_Thread5(drivePID);
+  while (enableDrivePID == true) {
+    vex::task::sleep(10);
+  }
+  //Next movement
+  resetPID_Sensors = true;
+  enableDrivePID = true;
+  desiredTurnValue = 40;
+  targetDistance = 0; //inches
+  vex::task drivePID_Thread6(drivePID);
+  Second_IM.setVelocity(100, percent); 
+  UpperMotor.setVelocity(40, percent);
+  IntakeMotor.spin(reverse);
+  Second_IM.spin(reverse);
+  UpperMotor.spin(reverse);
+  while (enableDrivePID == true) {
+    vex::task::sleep(10);
+  }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 45;
+  // targetDistance = -20; //inches
+  // vex::task drivePID_Thread7(drivePID);
+  // IntakeMotor.stop();
+  // Second_IM.stop();
+  // UpperMotor.stop();
+  // scraperState = false;
+  // scraper.set(false);  
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 270;
+  // targetDistance = 22; //inches
+  // vex::task drivePID_Thread8(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+
+
+
 
   //Set desired location moves forward 5 inch and left 90 deg.
-
-  //Starts moving intake while driving forward
-  // IntakeMotor.spin(forward);
-
   // When it finishes, continue to next movement
   // resetPID_Sensors = true;
   // enableDrivePID = true;
@@ -499,12 +585,22 @@ void autonomous(void) {
 }
 
 void userControl(void) {
+  Drivetrain.setDriveVelocity(100, percent);
+  Drivetrain.setTurnVelocity(100, percent);
+  Brain.Screen.print("autonomous code");
+  IntakeMotor.setVelocity(100, percent);
+  UpperMotor.setVelocity(100, percent);
+  Second_IM.setVelocity(100, percent);
+  LeftDriveSmart.setStopping(brake);
+  RightDriveSmart.setStopping(brake);
+  IntakeMotor.setStopping(brake);
   Controller1.ButtonA.pressed(Scraper);
   Controller1.ButtonB.pressed(Descore);
   Controller1.ButtonX.pressed(Negus);
   Controller1.ButtonY.pressed(NoNegus);
   isAutonomous = false;
   isDriverControl = true;
+
   LeftDriveSmart.setStopping(brake);
   RightDriveSmart.setStopping(brake);
   IntakeMotor.setStopping(brake);
@@ -517,9 +613,6 @@ void userControl(void) {
     enableDrivePID = false; //disables PID control during user control
     wait(10, msec);
     input();
-    while(1==1){
-    Brain.Screen.print(rotational.position(deg));
-    }
   }  
 }
 
