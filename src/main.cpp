@@ -477,80 +477,81 @@ void autonomous(void) {
   */
   // place automonous code here
   // Start PID control
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 90;
-  targetDistance = 11; //inches
-  vex::task drivePID_Thread(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 110;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread2(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  maxMotorPercentage = 30;
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 110;
-  targetDistance = 19; //inches
-  vex::task drivePID_Thread3(drivePID);
-  IntakeMotor.setVelocity(100, percent);
-  Second_IM.setVelocity(15, percent); 
-  UpperMotor.setVelocity(20, percent);
-  Second_IM.spin(forward);
-  UpperMotor.spin(forward);
-  IntakeMotor.spin(forward);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  maxMotorPercentage = 100;
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 40;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread4(drivePID);
-  IntakeMotor.stop();
-  Second_IM.stop();
-  UpperMotor.stop();
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 40;
-  targetDistance = 14; //inches
-  vex::task drivePID_Thread5(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 40;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread6(drivePID);
-  Second_IM.setVelocity(100, percent); 
-  UpperMotor.setVelocity(40, percent);
-  IntakeMotor.spin(reverse);
-  Second_IM.spin(reverse);
-  UpperMotor.spin(reverse);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 90;
+  // targetDistance = 11; //inches
+  // vex::task drivePID_Thread(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
   // //Next movement
   // resetPID_Sensors = true;
   // enableDrivePID = true;
+  // desiredTurnValue = 110;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread2(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // maxMotorPercentage = 30;
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 110;
+  // targetDistance = 19; //inches
+  // vex::task drivePID_Thread3(drivePID);
+  // IntakeMotor.setVelocity(100, percent);
+  // Second_IM.setVelocity(15, percent); 
+  // UpperMotor.setVelocity(15, percent);
+  // Second_IM.spin(forward);
+  // UpperMotor.spin(forward);
+  // IntakeMotor.spin(forward);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // maxMotorPercentage = 100;
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 40;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread4(drivePID);
+  // IntakeMotor.stop();
+  // Second_IM.stop();
+  // UpperMotor.stop();
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 40;
+  // targetDistance = 14; //inches
+  // vex::task drivePID_Thread5(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 40;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread6(drivePID);
+  // Second_IM.setVelocity(100, percent); 
+  // UpperMotor.setVelocity(40, percent);
+  // IntakeMotor.spin(reverse);
+  // Second_IM.spin(reverse);
+  // UpperMotor.spin(reverse);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // vex::task::sleep(4000);
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
   // desiredTurnValue = 45;
-  // targetDistance = -20; //inches
+  // targetDistance = -(25); //inches
   // vex::task drivePID_Thread7(drivePID);
   // IntakeMotor.stop();
   // Second_IM.stop();
@@ -564,12 +565,73 @@ void autonomous(void) {
   // resetPID_Sensors = true;
   // enableDrivePID = true;
   // desiredTurnValue = 270;
-  // targetDistance = 22; //inches
+  // targetDistance = 0; //inches
   // vex::task drivePID_Thread8(drivePID);
   // while (enableDrivePID == true) {
   //   vex::task::sleep(10);
   // }
-
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 270;
+  // targetDistance = 10; //inches
+  // IntakeMotor.setVelocity(100, percent);
+  // Second_IM.setVelocity(15, percent); 
+  // UpperMotor.setVelocity(15, percent);
+  // Second_IM.spin(forward);
+  // UpperMotor.spin(forward);
+  // IntakeMotor.spin(forward);
+  // vex::task drivePID_Thread9(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 270;
+  // targetDistance = -(10); //inches
+  // vex::task drivePID_Thread10(drivePID);
+  // IntakeMotor.stop();
+  // Second_IM.stop();
+  // UpperMotor.stop();
+  // scraperState = true;
+  // scraper.set(true); 
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 90;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread11(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 90;
+  // targetDistance = 10; //inches
+  // vex::task drivePID_Thread12(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 90;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread13(drivePID);
+  // IntakeMotor.setVelocity(100, percent);
+  // Second_IM.setVelocity(100, percent); 
+  // UpperMotor.setVelocity(100, percent);
+  // Second_IM.spin(forward);
+  // UpperMotor.spin(forward);
+  // IntakeMotor.spin(forward);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
 
 
 
