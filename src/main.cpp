@@ -75,9 +75,6 @@ void initializeRandomSeed(){
   srand(seed);
 }
 
-bool isAutonomous = false;
-bool isDriverControl = false; 
-
 
 void vexcodeInit() {
 
@@ -172,8 +169,8 @@ coordinates of left side ball cluster
 //PID Settings; Tweak these values to tune PID.
 //For going straight
 const double kP = 7;  //7
-const double kI = 0.1;
-const double kD = 5; //2
+const double kI = 0;
+const double kD = 6; //2
 
 //For turning
 //0.09
@@ -332,33 +329,31 @@ void input() {
     UpperMotor.setVelocity(100, percent);
     UpperMotor.stop();
   }
-  
 }
-void Scraper(){
-    // wait(10, msec);
-    if (scraperState == true){
-      scraper.set(false);
-      scraperState = false;
-    }
-    else{
-      scraper.set(true);
-      scraperState = true;
-    }
-  }
+// void Scraper(){
+//     // wait(10, msec);
+//     if (scraperState == true){
+//       scraper.set(false);
+//       scraperState = false;
+//     }
+//     else{
+//       scraper.set(true);
+//       scraperState = true;
+//     }
+//   }
 
-bool DescoreState = false;
+// bool DescoreState = false;
 
-void Descore(){
-  if (DescoreState == true){
-    descore.set(false);
-    DescoreState = false;
-  }
-  else{
-    descore.set(true);
-    DescoreState = true;
-  }
-  
-}
+// void Descore(){
+//   if (DescoreState == true){
+//     descore.set(false);
+//     DescoreState = false;
+//   }
+//   else{
+//     descore.set(true);
+//     DescoreState = true;
+//   }
+// }
 
 bool NegusConfirmed = false;
 
@@ -427,8 +422,6 @@ void preAutonomous(void) {
 void autonomous(void) {
   //UpperMotor forward goes right, reverse goes left
   //IntakeMotor and Second_IM forward up, reverse down
-  isAutonomous = true;
-  isDriverControl = false;
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
   Brain.Screen.print("autonomous code");
@@ -442,13 +435,9 @@ void autonomous(void) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
   }
   Controller1.ButtonX.pressed(Negus);
-  scraperState = true;
-  scraper.set(true);
+  scraperState = false;
+  scraper.set(false);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-  // Drivetrain.driveFor(forward, 55, inches);
-  // Autonomous drivetrain has a bug where it will reverse the direction you input.
-  // you will need to reverse your action.
-  // Drivetrain.turnFor(left, 45, degrees);
   /* Desired locations for autonomous: Autonomous explaination
   Right side start autonomous: 
   1. Move to group of 3 ball location
@@ -499,7 +488,7 @@ void autonomous(void) {
   resetPID_Sensors = true;
   enableDrivePID = true;
   desiredTurnValue = 110;
-  targetDistance = 19; //inches
+  targetDistance = 20; //inches
   vex::task drivePID_Thread3(drivePID);
   IntakeMotor.setVelocity(100, percent);
   Second_IM.setVelocity(15, percent); 
@@ -514,7 +503,7 @@ void autonomous(void) {
   maxMotorPercentage = 100;
   resetPID_Sensors = true;
   enableDrivePID = true;
-  desiredTurnValue = 40;
+  desiredTurnValue = 35;
   targetDistance = 0; //inches
   vex::task drivePID_Thread4(drivePID);
   IntakeMotor.stop();
@@ -526,7 +515,7 @@ void autonomous(void) {
   //Next movement
   resetPID_Sensors = true;
   enableDrivePID = true;
-  desiredTurnValue = 40;
+  desiredTurnValue = 35;
   targetDistance = 14; //inches
   vex::task drivePID_Thread5(drivePID);
   while (enableDrivePID == true) {
@@ -535,133 +524,122 @@ void autonomous(void) {
   //Next movement
   resetPID_Sensors = true;
   enableDrivePID = true;
-  desiredTurnValue = 40;
+  desiredTurnValue = 35;
   targetDistance = 0; //inches
   vex::task drivePID_Thread6(drivePID);
   Second_IM.setVelocity(100, percent); 
   UpperMotor.setVelocity(40, percent);
+  IntakeMotor.setVelocity(50, percent);
   IntakeMotor.spin(reverse);
   Second_IM.spin(reverse);
   UpperMotor.spin(reverse);
   while (enableDrivePID == true) {
     vex::task::sleep(10);
   }
-  //Next movement
-  vex::task::sleep(4000);
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 45;
-  targetDistance = -(40); //inches
-  vex::task drivePID_Thread7(drivePID);
-  IntakeMotor.stop();
-  Second_IM.stop();
-  UpperMotor.stop();
-  scraperState = false;
-  scraper.set(false);  
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 270;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread8(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 270;
-  targetDistance = 15; //inches
-  IntakeMotor.setVelocity(100, percent);
-  Second_IM.setVelocity(15, percent); 
-  UpperMotor.setVelocity(15, percent);
-  Second_IM.spin(forward);
-  UpperMotor.spin(forward);
-  IntakeMotor.spin(forward);
-  vex::task drivePID_Thread9(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 270;
-  targetDistance = -(10); //inches
-  vex::task drivePID_Thread10(drivePID);
-  IntakeMotor.stop();
-  Second_IM.stop();
-  UpperMotor.stop();
-  scraperState = true;
-  scraper.set(true); 
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 90;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread11(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 90;
-  targetDistance = 13; //inches
-  vex::task drivePID_Thread12(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 90;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread13(drivePID);
-  IntakeMotor.setVelocity(100, percent);
-  Second_IM.setVelocity(100, percent); 
-  UpperMotor.setVelocity(100, percent);
-  Second_IM.spin(forward);
-  UpperMotor.spin(forward);
-  IntakeMotor.spin(forward);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-
-
-
-  //Set desired location moves forward 5 inch and left 90 deg.
-  // When it finishes, continue to next movement
+  // //Next movement
+  // vex::task::sleep(3000);
   // resetPID_Sensors = true;
   // enableDrivePID = true;
-  // drivePID(nextX, nextY, nextHeading);
-  // while (robotPosition[0] != 150 and robotPosition[1] != 90 and robotPosition[2] != 50) {
-  //   drivePID(150, 90, 50);
+  // desiredTurnValue = 45;
+  // targetDistance = -(40); //inches
+  // vex::task drivePID_Thread7(drivePID);
+  // IntakeMotor.stop();
+  // Second_IM.stop();
+  // UpperMotor.stop();
+  // scraperState = false;
+  // scraper.set(false);  
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
   // }
+  // //Next movement
+  // vex::task::sleep(500);
   // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 270;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread8(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 270;
+  // targetDistance = 15; //inches
+  // IntakeMotor.setVelocity(100, percent);
+  // Second_IM.setVelocity(15, percent); 
+  // UpperMotor.setVelocity(15, percent);
+  // Second_IM.spin(forward);
+  // UpperMotor.spin(forward);
+  // IntakeMotor.spin(forward);
+  // vex::task drivePID_Thread9(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 270;
+  // targetDistance = -(10); //inches
+  // vex::task drivePID_Thread10(drivePID);
+  // IntakeMotor.stop();
+  // Second_IM.stop();
+  // UpperMotor.stop();
+  // scraperState = true;
+  // scraper.set(true); 
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 90;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread11(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 90;
+  // targetDistance = 13; //inches
+  // vex::task drivePID_Thread12(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 90;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread13(drivePID);
+  // IntakeMotor.setVelocity(100, percent);
+  // Second_IM.setVelocity(100, percent); 
+  // UpperMotor.setVelocity(100, percent);
+  // Second_IM.spin(forward);
+  // UpperMotor.spin(forward);
+  // IntakeMotor.spin(forward);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
 }
 
 void userControl(void) {
+  enableDrivePID = false; //disables PID control during user control
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
-  Brain.Screen.print("autonomous code");
+  Brain.Screen.print("driver control");
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
   LeftDriveSmart.setStopping(brake);
   RightDriveSmart.setStopping(brake);
   IntakeMotor.setStopping(brake);
-  Controller1.ButtonA.pressed(Scraper);
-  Controller1.ButtonB.pressed(Descore);
-  Controller1.ButtonX.pressed(Negus);
-  Controller1.ButtonY.pressed(NoNegus);
-  isAutonomous = false;
-  isDriverControl = true;
+  // Controller1.ButtonA.pressed(Scraper);
+  // Controller1.ButtonB.pressed(Descore);
+  // Controller1.ButtonX.pressed(Negus);
+  // Controller1.ButtonY.pressed(NoNegus);
 
   LeftDriveSmart.setStopping(brake);
   RightDriveSmart.setStopping(brake);
@@ -670,11 +648,49 @@ void userControl(void) {
   
   // place driver control in this while loop
   
-  
+  bool DescoreState = false;
+  bool ScrapperCooling = false;
+  bool DescoreCooling = false;
+  double CoolingTime = 0;
   while(true){
-    enableDrivePID = false; //disables PID control during user control
-    wait(10, msec);
     input();
+    if (Controller1.ButtonA.pressing() == true){
+      if (scraperState == true){
+      scraper.set(false);
+      scraperState = false;
+      }
+    else{
+      scraper.set(true);
+      scraperState = true;
+      }
+      ScrapperCooling = true;
+      Controller1.Screen.clearLine(1);
+      Controller1.Screen.setCursor(1,1);
+      Controller1.Screen.print("Cooling Down!");
+      wait(1, seconds);
+      Controller1.Screen.clearLine(1);
+      Controller1.Screen.setCursor(1,1);
+      ScrapperCooling = false;
+    }
+    if (Controller1.ButtonB.pressing() == true){
+      if (DescoreState == true){
+        descore.set(false);
+        DescoreState = false;
+      }
+      else{
+        descore.set(true);
+        DescoreState = true;
+      }
+      DescoreCooling = true;
+      Controller1.Screen.clearLine(1);
+      Controller1.Screen.setCursor(1,1);
+      Controller1.Screen.print("Cooling Down!");
+      wait(1, seconds);
+      Controller1.Screen.clearLine(1);
+      Controller1.Screen.setCursor(1,1);
+      DescoreCooling = false;
+    }
+    vex::task::sleep(10);
   }  
 }
 
@@ -694,11 +710,6 @@ int main() {
   
   // Run the pre-autonomous function.
   preAutonomous();
-
-  while (isAutonomous == false && isDriverControl == false) {
-    scraper.set(false);
-    wait(100, msec);
-  }
 
   // Prevent main from exiting with an infinite loop.
   while (true) {
