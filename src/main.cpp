@@ -51,7 +51,8 @@ digital_out scraper = digital_out(Brain.ThreeWirePort.A);
 digital_out descore = digital_out(Brain.ThreeWirePort.H);
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
-rotation rotational = rotation(PORT17, true);
+rotation rotationalLateral = rotation(PORT17, true);
+rotation rotationalHorizontal = rotation(PORT18, false);
 
 //Initializes the inertial sensor. starts from 0 degrees and increases by turning clockwise.
 inertial inertialSensor = inertial(PORT19);
@@ -155,17 +156,29 @@ int rc_auto_loop_function_Controller1() {
 task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 
 //////////////////////////////////////////////
-//Start PID FUNCTIONS AND AUTO CODE
+//Autonomous Functions
 //////////////////////////////////////////////
-//Sets the initial robot vector (x, y, heading in degrees). Set whichever one to comment to start change position.
-//right side tracks from left corner
-//left side tracks from left corner
-//static double robotPosiition[3] = {61.25, 14.5, 90};  //left side of the field
+//Initial Positional Vector of the Robot
+float robotPosition[3] = {0, 0, 0};  //x, y, heading in degrees
+double previousHeading;
+//Odometry
+int odometry() {
+  while(true) {
+    //code for odometry here
+    //gets change in orientation as an absolute value. This is for the arc angle
+    double arcAngle = fabs(inertialSensor.heading() - robotPosition[2]);
+    //gets the radius of the tracking centers arc
+    //radius = distance travelled of lateral tracking wheel / arc angle * (PI/180) (to convert to radians)
+    double arcRadius = rotationalLateral.position(deg) / arcAngle * PI / 180;
+    //Gets the chord length to track local y coordinate
+    double y_chordLength = 2 * arcRadius * sin(arcAngle / 2);
 
-/*
-coordinates of left side ball cluster
-48,53
-*/
+
+    vex::task::sleep(10); //waits 100 milliseconds before next loop
+  }
+  return 0; //Doesn't matter what this returns
+}
+
 //PID Settings; Tweak these values to tune PID.
 //For going straight
 const double kP = 7;  //7
@@ -213,7 +226,7 @@ int drivePID() {
   while(enableDrivePID == true) {
     if (resetPID_Sensors == true) {
       //Resets the sensors and variables
-      rotational.resetPosition();
+      rotationalLateral.resetPosition();
       distanceError = 0;
       prevDistanceError = 0;
       derivativeDistanceError = 0;
@@ -266,7 +279,7 @@ int drivePID() {
     //(x,y) == (Rcos(theta),Rsin(theta))
     //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
     //Delta distance travelled since last reset
-    totalDistanceTravelled = rotational.position(deg) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
+    totalDistanceTravelled = rotationalLateral.position(deg) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
     targetDistance = targetDistance - (totalDistanceTravelled - previousDistanceTravelled);
     if (fabs(targetDistance) < 0.1 && fabs(headingError) < 3 && timerCount < 20) { //If within 1 inches and 3 degree of target, stop motors and exit task
       timerCount += 1;
@@ -411,7 +424,7 @@ void preAutonomous(void) {
   Brain.Screen.clearScreen();
   Brain.Screen.print("pre auton code");
   Drivetrain.setDriveVelocity(100, percent);
-  rotational.resetPosition(); //resetting the rotational sensor position to 0
+  rotationalLateral.resetPosition(); //resetting the rotational sensor position to 0
   //calibrating the inertial sensor MUST DO THIS
   inertialSensor.calibrate(); 
 }
