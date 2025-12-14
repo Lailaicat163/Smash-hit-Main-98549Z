@@ -1,7 +1,7 @@
 {
 	"project": {
 		"name": "RightAuto_Smash_Hit",
-		"slot": 2,
+		"slot": 1,
 		"description": "you want to crash our robot? You could try to do it, but might be your robot get crash first.",
 		"platform": "V5",
 		"creationDate": "Fri, 09 May 2025 16:57:34 GMT",
