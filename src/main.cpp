@@ -211,7 +211,6 @@ double totalDistanceTravelled = 0;
 
 int timerCount = 0;
 
-//NOT DONE THE PID FUNCTION PLZ DON'T TOUCH
 //PID FUNCTION STARTS HERE
 int drivePID() {
   while(enableDrivePID == true) {
