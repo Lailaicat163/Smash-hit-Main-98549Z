@@ -372,9 +372,9 @@ int path() {
 
 //Start PID Controller
 //For going straight
-const double kP = 5;  //7
+const double kP = 6;  //7
 const double kI = 0;
-const double kD = 0; //2
+const double kD = 0.01; //2 0.03
 
 //For turning
 const double turning_kP = 0; //less than .1 
@@ -431,11 +431,11 @@ int drivePID() {
     double robotHeading = inertialSensor.heading(); //in degrees
     //Calculates target values for distance
     //Forward movement error calculations
-    distanceError = targetDistance;
+    distanceError = targetDistance - totalDistanceTravelled;
     //Derivative and integral error calculations
-    derivativeDistanceError = distanceError - prevDistanceError;
+    derivativeDistanceError = (distanceError - prevDistanceError) / 0.02;
     if (fabs(distanceError) < 5) { //integral windup prevention. makes it so that integral only adds up when close to target
-      integralDistanceError += distanceError;
+      integralDistanceError += distanceError * 0.02;
     } else {
       integralDistanceError = 0;
     }
@@ -446,10 +446,10 @@ int drivePID() {
     headingError = desiredTurnValue - robotHeading;
     headingError = -1 * (atan2(sin(headingError * PI /180), cos(headingError * PI / 180)) * 180.0 / PI);
     // Derivative
-    double derivativeHeadingError = headingError - prevHeadingError;
+    double derivativeHeadingError = (headingError - prevHeadingError) / 0.02;
 
     if (fabs(headingError) < 15) { //integral windup prevention. makes it so that integral only adds up when close to target
-      integralHeadingError += headingError;
+      integralHeadingError += headingError * 0.02;
     } else {
       integralHeadingError = 0;
     }
@@ -470,10 +470,10 @@ int drivePID() {
     //Delta distance travelled since last reset
     totalDistanceTravelled = rotationalLateral.position(deg) * PI / 180;  //1.375 is radius of odom wheel in inches
     targetDistance = targetDistance - (totalDistanceTravelled - previousDistanceTravelled);
-    addDataPoint(distanceError);  // Or headingError, or motorPower, etc.
+    addDataPoint(headingError);  // Or headingError, or motorPower, etc.
     if (fabs(targetDistance) < 0.1 && fabs(headingError) < 3 && timerCount < 20) { //If within 1 inches and 3 degree of target, stop motors and exit task
       timerCount += 1;
-    } else if (fabs(targetDistance) > 0.1 && fabs(headingError) < 3) {
+    } else if (fabs(targetDistance) > 0.1 || fabs(headingError) < 3) {
       timerCount = 0;
     } else if (timerCount >= 20) {
       timerCount = 0;
@@ -667,8 +667,8 @@ void autonomous(void) {
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
-  desiredTurnValue = 90;
-  targetDistance = 10; //inches
+  desiredTurnValue = 180 ;
+  targetDistance = 0; //inches
   vex::task drivePID_Thread(drivePID);
   // while (enableDrivePID == true) {
   //   vex::task::sleep(10);
