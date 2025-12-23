@@ -13,6 +13,8 @@
 using namespace vex;
 
 #define PI 3.1415926535897
+#define DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL 7 / 16  //inches
+#define DISTANCE_FROM_CENTER_TO_HORIZONTAL_WHEEL 3  //inches
 
 // Brain should be defined by default
 brain Brain;
@@ -30,20 +32,20 @@ brain Brain;
 
 
 // Robot configuration code.
-motor leftMotorA = motor(PORT1, ratio6_1, false);
-motor leftMotorB = motor(PORT2, ratio6_1, false);
-motor leftMotorC = motor(PORT3, ratio6_1, false);
+motor leftMotorA = motor(PORT3, ratio6_1, true);
+motor leftMotorB = motor(PORT4, ratio6_1, true);
+motor leftMotorC = motor(PORT20, ratio6_1, true);
 motor_group LeftDriveSmart = motor_group(leftMotorA, leftMotorB, leftMotorC);
-motor rightMotorA = motor(PORT4, ratio6_1, true);
-motor rightMotorB = motor(PORT5, ratio6_1, true);
-motor rightMotorC = motor(PORT6, ratio6_1, true);
+motor rightMotorA = motor(PORT1, ratio6_1, false);
+motor rightMotorB = motor(PORT2, ratio6_1, false);
+motor rightMotorC = motor(PORT6, ratio6_1, false);
 motor_group RightDriveSmart = motor_group(rightMotorA, rightMotorB, rightMotorC);
 drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.7, 190.5, mm, 1);
    
 controller Controller1 = controller(primary);
 
 motor IntakeMotor = motor(PORT12, ratio36_1, true);
-motor UpperMotor = motor(PORT13, ratio36_1, true);
+motor UpperMotor = motor(PORT10, ratio36_1, true);
 motor Second_IM = motor(PORT14, ratio36_1, true);
 
 //Pneumatic A is for the scraper mechanism
@@ -51,11 +53,11 @@ digital_out scraper = digital_out(Brain.ThreeWirePort.A);
 digital_out descore = digital_out(Brain.ThreeWirePort.H);
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
-rotation rotationalLateral = rotation(PORT17, true);
-rotation rotationalHorizontal = rotation(PORT18, false);
+rotation rotationalLateral = rotation(PORT13, false);
+rotation rotationalHorizontal = rotation(PORT18, true);
 
 //Initializes the inertial sensor. starts from 0 degrees and increases by turning clockwise.
-inertial inertialSensor = inertial(PORT19);
+inertial inertialSensor = inertial(PORT14);
 
 
 //sets max rpm of motors
@@ -156,40 +158,227 @@ int rc_auto_loop_function_Controller1() {
 task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 
 //////////////////////////////////////////////
+//Math Functions Start
+//////////////////////////////////////////////
+//Matrix Multiplication
+// template<int R, int C>
+// using Matrix = std::array<std::array<double, C>, R>;
+
+// template<int R, int C, int K>
+// Matrix<R, K> multiply(const Matrix<R, C>& A, const Matrix<C, K>& B) {
+// Matrix<R, K> result{};
+// for (int i = 0; i < R; i++) {
+// for (int j = 0; j < K; j++) {
+// for (int k = 0; k < C; k++) {
+//   result[i][j] += A[i][k] * B[k][j];
+//     }
+//   }
+// }
+//   return result;
+// }
+
+//////////////////////////////////////////////
 //Autonomous Functions
 //////////////////////////////////////////////
+//Error graph tracking for PID
+// Graph settings (add to top of your file with other constants)
+const int GRAPH_WIDTH = 480;   // Brain screen width
+const int GRAPH_HEIGHT = 240;  // Brain screen height
+const int GRAPH_MARGIN = 30;   // Space for labels
+const int MAX_DATA_POINTS = 100; // Number of points to display
+
+// Data storage arrays
+double errorHistory[MAX_DATA_POINTS];
+int currentDataIndex = 0;
+
+// Scale settings
+double maxErrorScale = 10.0; // Adjust based on your typical error range
+
+void initializeGraph() {
+  // Clear array
+  for (int i = 0; i < MAX_DATA_POINTS; i++) {
+    errorHistory[i] = 0;
+  }
+  currentDataIndex = 0;
+}
+
+void drawGraph() {
+  Brain.Screen.clearScreen();
+  
+  // Draw axes
+  Brain.Screen.setPenColor(white);
+  Brain.Screen.drawLine(GRAPH_MARGIN, GRAPH_MARGIN, 
+                        GRAPH_MARGIN, GRAPH_HEIGHT - GRAPH_MARGIN); // Y-axis
+  Brain.Screen.drawLine(GRAPH_MARGIN, GRAPH_HEIGHT - GRAPH_MARGIN, 
+                        GRAPH_WIDTH - GRAPH_MARGIN, GRAPH_HEIGHT - GRAPH_MARGIN); // X-axis
+  
+  // Draw zero line
+  Brain.Screen.setPenColor(red);
+  int zeroY = GRAPH_HEIGHT / 2;
+  Brain.Screen.drawLine(GRAPH_MARGIN, zeroY, 
+                        GRAPH_WIDTH - GRAPH_MARGIN, zeroY);
+  
+  // Draw data points
+  Brain.Screen.setPenColor(green);
+  int graphWidth = GRAPH_WIDTH - 2 * GRAPH_MARGIN;
+  int graphHeight = GRAPH_HEIGHT - 2 * GRAPH_MARGIN;
+  
+  for (int i = 1; i < MAX_DATA_POINTS; i++) {
+    // Calculate screen positions
+    int x1 = GRAPH_MARGIN + (i - 1) * graphWidth / MAX_DATA_POINTS;
+    int x2 = GRAPH_MARGIN + i * graphWidth / MAX_DATA_POINTS;
+    
+    // Scale error values to screen coordinates
+    int y1 = zeroY - (errorHistory[i - 1] / maxErrorScale) * (graphHeight / 2);
+    int y2 = zeroY - (errorHistory[i] / maxErrorScale) * (graphHeight / 2);
+    
+    // Clamp to screen bounds
+    y1 = fmax(GRAPH_MARGIN, fmin(y1, GRAPH_HEIGHT - GRAPH_MARGIN));
+    y2 = fmax(GRAPH_MARGIN, fmin(y2, GRAPH_HEIGHT - GRAPH_MARGIN));
+    
+    Brain.Screen.drawLine(x1, y1, x2, y2);
+  }
+  
+  // Draw labels
+  Brain.Screen.setPenColor(white);
+  Brain.Screen.printAt(5, 15, "Error: %.2f", errorHistory[MAX_DATA_POINTS - 1]);
+  Brain.Screen.printAt(5, GRAPH_HEIGHT - 10, "Max: %.1f", maxErrorScale);
+  Brain.Screen.printAt(5, zeroY, "0");
+}
+
+void addDataPoint(double errorValue) {
+  // Shift all data left
+  for (int i = 0; i < MAX_DATA_POINTS - 1; i++) {
+    errorHistory[i] = errorHistory[i + 1];
+  }
+  // Add new data at the end
+  errorHistory[MAX_DATA_POINTS - 1] = errorValue;
+}
+
+// Task to continuously update graph
+int graphTask() {
+  initializeGraph();
+  while (true) {
+    drawGraph();
+    vex::task::sleep(50); // Update every 50ms (20 Hz)
+  }
+  return 0;
+}
+
 //Initial Positional Vector of the Robot
-float robotPosition[3] = {0, 0, 0};  //x, y, heading in degrees
-double previousHeading;
+double robotPosition[3] = {0, 0, 0};  //x, y, heading in degrees
+double previousAngleRotation = 0;
+double previousHeading = 0;
+double previousLateralTravelled = 0;
+double previousHorizontalTravelled = 0;
+
 //Odometry
 int odometry() {
   while(true) {
     //code for odometry here
+    //Calculating delta values
+    double deltaLateral = (rotationalLateral.position(deg) - previousLateralTravelled) * PI / 180; //inches
+    double deltaHorizontal = (rotationalHorizontal.position(deg) - previousHorizontalTravelled) * PI / 180; //inches
     //gets change in orientation as an absolute value. This is for the arc angle
-    double arcAngle = fabs(inertialSensor.heading() - robotPosition[2]);
+    double deltaOrientation = inertialSensor.rotation(deg) - previousAngleRotation; //in degrees
+    double arcAngle = fabs(deltaOrientation); //in degrees
+    double arcAngleRadians = arcAngle * (PI / 180); //in radians
+    //Make a check for small changes in order to avoid sensor noise
+    const double movementThreshold = 0.01; //inches
+    if (fabs(deltaLateral) < movementThreshold 
+    && fabs(deltaHorizontal) < movementThreshold 
+    && fabs(deltaOrientation) < movementThreshold) {
+      //No significant movement detected; skip this iteration
+      vex::task::sleep(10);
+      continue;
+    }
     //gets the radius of the tracking centers arc
     //radius = distance travelled of lateral tracking wheel / arc angle * (PI/180) (to convert to radians)
-    double arcRadius = rotationalLateral.position(deg) / arcAngle * PI / 180;
-    //Gets the chord length to track local y coordinate
-    double y_chordLength = 2 * arcRadius * sin(arcAngle / 2);
+    double lateralArcRadius;
 
-
+    //Gets the local chord length
+    double localDeltaX, localDeltaY;
+    if (fabs(deltaOrientation) <= 0.001) {
+      localDeltaX = deltaHorizontal;
+      localDeltaY = deltaLateral;
+    } else {
+      if (deltaOrientation < 0) {
+        lateralArcRadius = deltaLateral / arcAngleRadians - DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL;
+      } else if (deltaOrientation > 0) {
+        lateralArcRadius = deltaLateral / arcAngleRadians + DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL;
+      }
+      double horizontalArcRadius = deltaHorizontal / arcAngleRadians + DISTANCE_FROM_CENTER_TO_HORIZONTAL_WHEEL;
+      localDeltaX = 2 * horizontalArcRadius * sin(arcAngleRadians / 2);
+      localDeltaY = 2 * lateralArcRadius * sin(arcAngleRadians / 2);
+    }
+    //Converts local changes to global changes
+    double gridOffset = previousAngleRotation + (deltaOrientation / 2); //in degrees
+    double gridOffsetRadians = gridOffset * (PI / 180); //in radians
+    robotPosition[0] += localDeltaX * cos(gridOffsetRadians) - localDeltaY * sin(gridOffsetRadians);
+    robotPosition[1] += localDeltaX * sin(gridOffsetRadians) + localDeltaY * cos(gridOffsetRadians);
+    robotPosition[2] = inertialSensor.heading(deg);
+    //Updating previous values
+    previousAngleRotation = inertialSensor.rotation(deg);
+    previousHeading = inertialSensor.heading(deg);
+    previousLateralTravelled = rotationalLateral.position(deg);
+    previousHorizontalTravelled = rotationalHorizontal.position(deg);
     vex::task::sleep(10); //waits 100 milliseconds before next loop
   }
   return 0; //Doesn't matter what this returns
 }
 
-//PID Settings; Tweak these values to tune PID.
+//Brain odometry output test
+int odometryTest() {
+  while (true) {
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("x: ");
+  Brain.Screen.print(robotPosition[0]);
+  Brain.Screen.newLine();
+  Brain.Screen.print("y: ");
+  Brain.Screen.print(robotPosition[1]);
+  Brain.Screen.newLine();
+  Brain.Screen.print("Heading: ");
+  Brain.Screen.print(robotPosition[2]);
+  Brain.Screen.newLine();
+  Brain.Screen.print(rotationalLateral.position(deg));
+  Brain.Screen.newLine();
+  Brain.Screen.print(rotationalHorizontal.position(deg));
+  Brain.Screen.setCursor(1,1);
+  vex::task::sleep(100);
+  }
+  return 0;
+}
+//Path Following Functions
+//Ramsete Controller
+
+//Ramsete tweaking values
+const double zeta = 0.7; //damping coefficient
+const double b = 2.0;  //acts like a proportional gain
+
+void goTo(double desiredX, double desiredY, double desiredTheta, double velocity, double turningVelocity) {
+  //Coordinate errors
+  double errorX = desiredX - robotPosition[0];
+  double errorY = desiredY - robotPosition[1];
+  double errorTheta = 0;
+}
+
+//Path Making
+
+//Path 
+int path() {
+  goTo(1,1,1,1,1);
+  return 0;
+}
+
+//Start PID Controller
 //For going straight
-const double kP = 7;  //7
+const double kP = 5;  //7
 const double kI = 0;
-const double kD = 6; //2
+const double kD = 0; //2
 
 //For turning
-//0.09
-const double turning_kP = 0.6; //less than .1 
+const double turning_kP = 0; //less than .1 
 const double turning_kI = 0; //should be a really small number 0.024 example
-//0.05
 const double turning_kD = 0; //less than .05 usually
 
 //Initializing other variables for PID. These will be changed by the function, not the user.
@@ -221,7 +410,7 @@ double totalDistanceTravelled = 0;
 
 int timerCount = 0;
 
-//PID FUNCTION STARTS HERE
+//PID function for driving
 int drivePID() {
   while(enableDrivePID == true) {
     if (resetPID_Sensors == true) {
@@ -279,8 +468,9 @@ int drivePID() {
     //(x,y) == (Rcos(theta),Rsin(theta))
     //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
     //Delta distance travelled since last reset
-    totalDistanceTravelled = rotationalLateral.position(deg) * PI / 180 * 1.375;  //1.375 is radius of odom wheel in inches
+    totalDistanceTravelled = rotationalLateral.position(deg) * PI / 180;  //1.375 is radius of odom wheel in inches
     targetDistance = targetDistance - (totalDistanceTravelled - previousDistanceTravelled);
+    addDataPoint(distanceError);  // Or headingError, or motorPower, etc.
     if (fabs(targetDistance) < 0.1 && fabs(headingError) < 3 && timerCount < 20) { //If within 1 inches and 3 degree of target, stop motors and exit task
       timerCount += 1;
     } else if (fabs(targetDistance) > 0.1 && fabs(headingError) < 3) {
@@ -305,6 +495,14 @@ int drivePID() {
   }
   return 1; //Doesn't matter what this returns
 }
+
+
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+//Controller input functions start here
 
 bool scraperState = false;
 
@@ -425,8 +623,13 @@ void preAutonomous(void) {
   Brain.Screen.print("pre auton code");
   Drivetrain.setDriveVelocity(100, percent);
   rotationalLateral.resetPosition(); //resetting the rotational sensor position to 0
+  rotationalHorizontal.resetPosition(); //resetting the rotational sensor position to 0
   //calibrating the inertial sensor MUST DO THIS
   inertialSensor.calibrate(); 
+  while (inertialSensor.isCalibrating()) {
+    wait(100, msec);
+  }
+  inertialSensor.resetRotation();
 }
 
 
@@ -434,210 +637,122 @@ void preAutonomous(void) {
 void autonomous(void) {
   //UpperMotor forward goes right, reverse goes left
   //IntakeMotor and Second_IM forward up, reverse down
+  rotationalHorizontal.resetPosition(); //resetting the rotational sensor position to 0
+  rotationalLateral.resetPosition(); //resetting the rotational sensor position to 0
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
   Brain.Screen.print("autonomous code");
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
-  LeftDriveSmart.setStopping(brake);
-  RightDriveSmart.setStopping(brake);
+  LeftDriveSmart.setStopping(coast);
+  RightDriveSmart.setStopping(coast);
   IntakeMotor.setStopping(brake);
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+    robotPosition[2] = 90;
+    inertialSensor.resetRotation();
   }
   Controller1.ButtonX.pressed(Negus);
   scraperState = false;
   scraper.set(false);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-  /* Desired locations for autonomous: Autonomous explaination
-  Right side start autonomous: 
-  1. Move to group of 3 ball location
-  2. Intake
-  3. turn left to middle goal
-  4. outtake
-  5. move in front of match load
-  6. initiate scraper
-  7. move into match load and intake only red balls
-  8. move back
-  9. turn to face long goal
-  10. move forward
-  11. outtake
-  Left side start autonomous: 
-  1. Move to group of 3 ball location
-  2. Intake
-  3. turn right to middle goal
-  4. outtake
-  5. move in front of match load
-  6. initiate scraper
-  7. move into match load and intake only red balls
-  8. move back
-  9. turn to face long goal
-  10. move forward
-  11. outtake
-  */
   // place automonous code here
+  // vex::task odometryTest_Thread(odometryTest);
+
+  vex::task odometry_Thread(odometry);
+  vex::task graph_Thread(graphTask);
+  // //drive forward 10 inches
+  // Drivetrain.driveFor(forward, 10, inches);
   // Start PID control
   resetPID_Sensors = true;
   enableDrivePID = true;
   desiredTurnValue = 90;
-  targetDistance = 11; //inches
+  targetDistance = 10; //inches
   vex::task drivePID_Thread(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 110;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread2(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  maxMotorPercentage = 30;
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 110;
-  targetDistance = 20; //inches
-  vex::task drivePID_Thread3(drivePID);
-  IntakeMotor.setVelocity(100, percent);
-  Second_IM.setVelocity(15, percent); 
-  UpperMotor.setVelocity(15, percent);
-  Second_IM.spin(forward);
-  UpperMotor.spin(forward);
-  IntakeMotor.spin(forward);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  maxMotorPercentage = 100;
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 35;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread4(drivePID);
-  IntakeMotor.stop();
-  Second_IM.stop();
-  UpperMotor.stop();
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 35;
-  targetDistance = 14; //inches
-  vex::task drivePID_Thread5(drivePID);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  //Next movement
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 35;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread6(drivePID);
-  Second_IM.setVelocity(100, percent); 
-  UpperMotor.setVelocity(40, percent);
-  IntakeMotor.setVelocity(50, percent);
-  IntakeMotor.spin(reverse);
-  Second_IM.spin(reverse);
-  UpperMotor.spin(reverse);
-  while (enableDrivePID == true) {
-    vex::task::sleep(10);
-  }
-  // //Next movement
-  // vex::task::sleep(3000);
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // desiredTurnValue = 45;
-  // targetDistance = -(40); //inches
-  // vex::task drivePID_Thread7(drivePID);
-  // IntakeMotor.stop();
-  // Second_IM.stop();
-  // UpperMotor.stop();
-  // scraperState = false;
-  // scraper.set(false);  
   // while (enableDrivePID == true) {
   //   vex::task::sleep(10);
   // }
   // //Next movement
-  // vex::task::sleep(500);
   // resetPID_Sensors = true;
   // enableDrivePID = true;
-  // desiredTurnValue = 270;
+  // desiredTurnValue = 110;
   // targetDistance = 0; //inches
-  // vex::task drivePID_Thread8(drivePID);
+  // vex::task drivePID_Thread2(drivePID);
   // while (enableDrivePID == true) {
   //   vex::task::sleep(10);
   // }
   // //Next movement
+  // maxMotorPercentage = 30;
   // resetPID_Sensors = true;
   // enableDrivePID = true;
-  // desiredTurnValue = 270;
-  // targetDistance = 15; //inches
+  // desiredTurnValue = 110;
+  // targetDistance = 20; //inches
+  // vex::task drivePID_Thread3(drivePID);
   // IntakeMotor.setVelocity(100, percent);
   // Second_IM.setVelocity(15, percent); 
   // UpperMotor.setVelocity(15, percent);
   // Second_IM.spin(forward);
   // UpperMotor.spin(forward);
   // IntakeMotor.spin(forward);
-  // vex::task drivePID_Thread9(drivePID);
   // while (enableDrivePID == true) {
   //   vex::task::sleep(10);
   // }
   // //Next movement
+  // maxMotorPercentage = 100;
   // resetPID_Sensors = true;
   // enableDrivePID = true;
-  // desiredTurnValue = 270;
-  // targetDistance = -(10); //inches
-  // vex::task drivePID_Thread10(drivePID);
+  // desiredTurnValue = 35;
+  // targetDistance = 0; //inches
+  // vex::task drivePID_Thread4(drivePID);
   // IntakeMotor.stop();
   // Second_IM.stop();
   // UpperMotor.stop();
-  // scraperState = true;
-  // scraper.set(true); 
   // while (enableDrivePID == true) {
   //   vex::task::sleep(10);
   // }
   // //Next movement
   // resetPID_Sensors = true;
   // enableDrivePID = true;
-  // desiredTurnValue = 90;
+  // desiredTurnValue = 35;
+  // targetDistance = 14; //inches
+  // vex::task drivePID_Thread5(drivePID);
+  // while (enableDrivePID == true) {
+  //   vex::task::sleep(10);
+  // }
+  // //Next movement
+  // resetPID_Sensors = true;
+  // enableDrivePID = true;
+  // desiredTurnValue = 35;
   // targetDistance = 0; //inches
-  // vex::task drivePID_Thread11(drivePID);
-  // while (enableDrivePID == true) {
-  //   vex::task::sleep(10);
-  // }
-  // //Next movement
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // desiredTurnValue = 90;
-  // targetDistance = 13; //inches
-  // vex::task drivePID_Thread12(drivePID);
-  // while (enableDrivePID == true) {
-  //   vex::task::sleep(10);
-  // }
-  // //Next movement
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // desiredTurnValue = 90;
-  // targetDistance = 0; //inches
-  // vex::task drivePID_Thread13(drivePID);
-  // IntakeMotor.setVelocity(100, percent);
+  // vex::task drivePID_Thread6(drivePID);
   // Second_IM.setVelocity(100, percent); 
-  // UpperMotor.setVelocity(100, percent);
-  // Second_IM.spin(forward);
-  // UpperMotor.spin(forward);
-  // IntakeMotor.spin(forward);
+  // UpperMotor.setVelocity(40, percent);
+  // IntakeMotor.setVelocity(50, percent);
+  // IntakeMotor.spin(reverse);
+  // Second_IM.spin(reverse);
+  // UpperMotor.spin(reverse);
   // while (enableDrivePID == true) {
   //   vex::task::sleep(10);
   // }
 }
 
 void userControl(void) {
+  vex::task odometry_Thread(odometry);
+  while (true) {
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("x: ");
+  Brain.Screen.print(robotPosition[0]);
+  Brain.Screen.print("y: ");
+  Brain.Screen.print(robotPosition[1]);
+  Brain.Screen.print("Heading: ");
+  Brain.Screen.print(robotPosition[2]);
+  vex::task::sleep(4000);
+  }
+  if (inertialSensor.isCalibrating() == false) {
+    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+    inertialSensor.resetRotation();
+  }
   enableDrivePID = false; //disables PID control during user control
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
@@ -645,8 +760,8 @@ void userControl(void) {
   IntakeMotor.setVelocity(100, percent);
   UpperMotor.setVelocity(100, percent);
   Second_IM.setVelocity(100, percent);
-  LeftDriveSmart.setStopping(brake);
-  RightDriveSmart.setStopping(brake);
+  LeftDriveSmart.setStopping(coast);
+  RightDriveSmart.setStopping(coast);
   IntakeMotor.setStopping(brake);
   // Controller1.ButtonA.pressed(Scraper);
   // Controller1.ButtonB.pressed(Descore);
