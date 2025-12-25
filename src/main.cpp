@@ -170,6 +170,38 @@ int rc_auto_loop_function_Controller1() {
 
 task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 
+
+
+
+
+
+//////////////////////////////////////////////
+//Quintic bezier curve path making start
+//////////////////////////////////////////////
+//First define start and end points
+//x, y
+//calculate interpolation points
+//t goes from 0 to 1
+//start and end value are for individual coordinates. For example, start x and end x.
+double getLinearInterpolationValue(double startValue, double endValue, double ratio) {
+  return startValue + (endValue - startValue) * ratio;
+}
+struct Point {
+  double x;
+  double y;
+};
+
+
+
+
+
+
+
+
+
+
+
+
 //////////////////////////////////////////////
 //Math Functions Start
 //////////////////////////////////////////////
@@ -491,6 +523,7 @@ int path() {
   goTo(1,1,1,1,1);
   return 0;
 }
+
 
 //PID Controller for tuning velocities given by the Ramsete controller
 
