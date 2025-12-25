@@ -16,6 +16,7 @@ using namespace vex;
 #define WHEEL_CIRCUMFERENCE 3.25 * PI  //inches
 #define DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL 7 / 16  //inches
 #define DISTANCE_FROM_CENTER_TO_HORIZONTAL_WHEEL 3  //inches
+#define TRACK_WIDTH 10.75  //inches
 
 // Brain should be defined by default
 brain Brain;
@@ -70,7 +71,11 @@ distance doubleParkMacro = distance(PORT20);
 
 //sets max rpm of motors
 float maxMotorPercentage = 100.0;
+//radian conversion variable to reduce number of calculations
 double radianConversion = PI / 180.0; //conversion factor from degrees to radians
+//Sets gear ratio
+double gearRatio = 3 / 5; // input gear teeth / output gear teeth
+
 // controller Controller2 = controller(partner);
 
 // generating and setting random seed
@@ -439,6 +444,16 @@ double rightMotorVelocity;
 void goTo(double desiredX, double desiredY, double desiredTheta, double desiredLinearVelocity, double desiredTurningVelocity) {
   //Start the while loop for the controller
   while(true) {
+  //Update the local transformation matrix based on current robot heading
+  localTransformationMatrix.at(0,0) = cos(robotPosition.at(2,0) * radianConversion); //row 1, col 1
+  localTransformationMatrix.at(0,1) = sin(robotPosition.at(2,0) * radianConversion); //row 1, col 2
+  localTransformationMatrix.at(0,2) = 0; //row 1, col 3
+  localTransformationMatrix.at(1,0) = -sin(robotPosition.at(2,0) * radianConversion); //row 2, col 1
+  localTransformationMatrix.at(1,1) = cos(robotPosition.at(2,0) * radianConversion); //row 2, col 2
+  localTransformationMatrix.at(1,2) = 0; //row 2, col 3
+  localTransformationMatrix.at(2,0) = 0; //row 3, col 1
+  localTransformationMatrix.at(2,1) = 0; //row 3, col 2
+  localTransformationMatrix.at(2,2) = 1; //row 3, col 3
   //Coordinate errors
   matrix targetPosition{3,1};
   targetPosition.at(0,0) = desiredX;
@@ -462,8 +477,9 @@ void goTo(double desiredX, double desiredY, double desiredTheta, double desiredL
   + k * localError.at(2,0) * radianConversion;
   //Calculate motor power
   double linearMotorVelocity = velocity / WHEEL_CIRCUMFERENCE;
-  leftMotorVelocity = linearMotorVelocity + angularVelocity;
-  rightMotorVelocity = linearMotorVelocity - angularVelocity;
+  double wheelAngularContribution = (angularVelocity * TRACK_WIDTH) / (2 * WHEEL_CIRCUMFERENCE);
+  leftMotorVelocity = linearMotorVelocity + wheelAngularContribution;
+  rightMotorVelocity = linearMotorVelocity - wheelAngularContribution;
   }
   vex::task::sleep(20); //waits 20 milliseconds before next loop
 }
@@ -487,15 +503,49 @@ const double velocity_kD = 0.0;
 
 //Error variables for velocity PID
 //left side
+double leftVelocity;
 double leftVelocityError;
-double leftPrevVelocityError = 0;
+double leftPrevVelocityError = 0.0;
 double leftDerivativeVelocityError;
-double leftIntegralVelocityError = 0;
+double leftIntegralVelocityError = 0.0;
 //right side
+double rightVelocity;
 double rightVelocityError;
-double rightPrevVelocityError = 0;
+double rightPrevVelocityError = 0.0;
 double rightDerivativeVelocityError;
-double rightIntegralVelocityError = 0;
+double rightIntegralVelocityError = 0.0;
+
+//Velocity PID function
+int velocityPID() {
+  while(true) {
+    //Velocity calculations
+    leftVelocity = (LeftDriveSmart.velocity(rpm) / 60.0) * WHEEL_CIRCUMFERENCE * gearRatio;
+    rightVelocity = (RightDriveSmart.velocity(rpm) / 60.0) * WHEEL_CIRCUMFERENCE * gearRatio;
+    //Left side PID error calculations
+    leftVelocityError = leftMotorVelocity - leftVelocity;
+    leftDerivativeVelocityError = (leftVelocityError - leftPrevVelocityError) / 0.02;
+    if (fabs(leftVelocityError) < 1.0) { //integral windup prevention. makes it so that integral only adds up when close to target
+      leftIntegralVelocityError += leftVelocityError * 0.02;
+    } else {
+      leftIntegralVelocityError = 0.0;
+    }
+    //Right side PID error calculations
+    rightVelocityError = rightMotorVelocity - rightVelocity;
+    rightDerivativeVelocityError = (rightVelocityError - rightPrevVelocityError) / 0.02;
+    if (fabs(rightVelocityError) < 1.0) { //integral windup prevention. makes it so that integral only adds up when close to target
+      rightIntegralVelocityError += rightVelocityError * 0.02;
+    } else {
+      rightIntegralVelocityError = 0.0;
+    }
+    //Calculating motor powers
+    double leftMotorPower = (leftVelocityError * velocity_kP) + (leftIntegralVelocityError * velocity_kI) + (leftDerivativeVelocityError * velocity_kD);
+    double rightMotorPower = (rightVelocityError * velocity_kP) + (rightIntegralVelocityError * velocity_kI) + (rightDerivativeVelocityError * velocity_kD);
+    //Setting motor powers
+    LeftDriveSmart.spin(forward, leftMotorPower, percent);
+    RightDriveSmart.spin(forward, rightMotorPower, percent);
+    vex ::task::sleep(20); //waits 20 milliseconds before next loop
+  }
+}
 
 //Start Driving Forward PID Controller
 //For going straight
@@ -762,16 +812,6 @@ void preAutonomous(void) {
 
 
 void autonomous(void) {
-  //Assign values to the local transformation matrix
-  localTransformationMatrix.at(0,0) = cos(robotPosition.at(2,0) * radianConversion); //row 1, col 1
-  localTransformationMatrix.at(0,1) = sin(robotPosition.at(2,0) * radianConversion); //row 1, col 2
-  localTransformationMatrix.at(0,2) = 0; //row 1, col 3
-  localTransformationMatrix.at(1,0) = -sin(robotPosition.at(2,0) * radianConversion); //row 2, col 1
-  localTransformationMatrix.at(1,1) = cos(robotPosition.at(2,0) * radianConversion); //row 2, col 2
-  localTransformationMatrix.at(1,2) = 0; //row 2, col 3
-  localTransformationMatrix.at(2,0) = 0; //row 3, col 1
-  localTransformationMatrix.at(2,1) = 0; //row 3, col 2
-  localTransformationMatrix.at(2,2) = 1; //row 3, col 3
   //Robot Position Vector Initialization
   robotPosition.at(0,0) = 0; //x position in inches
   robotPosition.at(1,0) = 0; //y position in inches
