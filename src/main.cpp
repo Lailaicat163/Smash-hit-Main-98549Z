@@ -13,6 +13,7 @@
 using namespace vex;
 
 #define PI 3.1415926535897
+#define WHEEL_CIRCUMFERENCE 3.25 * PI  //inches
 #define DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL 7 / 16  //inches
 #define DISTANCE_FROM_CENTER_TO_HORIZONTAL_WHEEL 3  //inches
 
@@ -59,10 +60,17 @@ rotation rotationalHorizontal = rotation(PORT18, true);
 //Initializes the inertial sensor. starts from 0 degrees and increases by turning clockwise.
 inertial inertialSensor = inertial(PORT14);
 
+//Initializes the distance sensors (4)
+distance distanceFront = distance(PORT15);
+distance distanceLeft = distance(PORT16);
+distance distanceRight = distance(PORT17);
+
+distance doubleParkMacro = distance(PORT20);
+
 
 //sets max rpm of motors
 float maxMotorPercentage = 100.0;
-
+double radianConversion = PI / 180.0; //conversion factor from degrees to radians
 // controller Controller2 = controller(partner);
 
 // generating and setting random seed
@@ -160,23 +168,88 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 //////////////////////////////////////////////
 //Math Functions Start
 //////////////////////////////////////////////
-//Matrix Multiplication
-// template<int R, int C>
-// using Matrix = std::array<std::array<double, C>, R>;
+//Matrix Class contains multiplication function and creating matrix of given size
+class matrix {
+private:
+  double** data;
+  int rows;
+  int cols;
 
-// template<int R, int C, int K>
-// Matrix<R, K> multiply(const Matrix<R, C>& A, const Matrix<C, K>& B) {
-// Matrix<R, K> result{};
-// for (int i = 0; i < R; i++) {
-// for (int j = 0; j < K; j++) {
-// for (int k = 0; k < C; k++) {
-//   result[i][j] += A[i][k] * B[k][j];
-//     }
-//   }
-// }
-//   return result;
-// }
+public:
+  // Constructor
+  matrix(int r, int c) : rows(r), cols(c) {
+  //Assigns memory for each row
+    data = new double*[rows];
+    for(int i = 0; i < rows; i++) {
+  // Makes each row get its own column, which is an array
+      data[i] = new double[cols];
+  // Memset makes all values in the matrix 0 to initialize it and get no errors
+  // User will add values for the matrix later
+      memset(data[i], 0, cols * sizeof(double));
+      }
+  }
 
+  // Destructor removes allocated memory to prevent memory leaks
+  ~matrix() {
+    for(int i = 0; i < rows; i++) {
+      delete[] data[i];
+    }
+    delete[] data;
+  }
+
+  // Access elements
+  double& at(int r, int c) {
+    return data[r][c];
+  }
+
+  // Getters
+  int getRows() { return rows; }
+  int getCols() { return cols; }
+
+  // Matrix multiplication: this * other
+  matrix multiply(const matrix& other) {
+  // Result will be (this->rows) x (other.cols)
+  matrix result(rows, other.cols);
+
+  for(int i = 0; i < rows; i++) {
+    for(int j = 0; j < other.cols; j++) {
+      double sum = 0.0;
+      for(int k = 0; k < cols; k++) {
+        sum += data[i][k] * other.data[k][j];
+      }
+    result.data[i][j] = sum;
+    }
+  }
+  return result;
+  }
+  matrix subtract(const matrix& other) {
+  //You can only subtract matrices of the same size
+  matrix result(rows, cols);
+    
+  for(int i = 0; i < rows; i++) {
+    for(int j = 0; j < cols; j++) {
+      result.data[i][j] = data[i][j] - other.data[i][j];
+      }
+    } 
+    return result;
+    }
+};
+/* How to use matrix class:
+1. Define matrix size
+matrix A(2, 3); // 2 rows, 3 columns
+matrix B(3, 2); // 3 rows, 2 columns
+2. Set values
+A.at(0, 0) = 1.0; A.at(0, 1) = 2.0; A.at(0, 2) = 3.0; // first row. Has 3 columns
+A.at(1, 0) = 4.0; A.at(1, 1) = 5.0; A.at(1, 2) = 6.0; // second row. Has 3 columns
+ Do the same for matrix B
+B.at(0, 0) = 7;   B.at(0, 1) = 8;
+B.at(1, 0) = 9;   B.at(1, 1) = 10;
+B.at(2, 0) = 11;  B.at(2, 1) = 12;
+3. Multiply matrices
+matrix C = A.multiply(B); // Resulting matrix C will be 2x2
+4. Get values from new matrix C
+double val = C.at(0, 0); // Access element at row 0, column 0
+*/
 //////////////////////////////////////////////
 //Autonomous Functions
 //////////////////////////////////////////////
@@ -266,7 +339,7 @@ int graphTask() {
 }
 
 //Initial Positional Vector of the Robot
-double robotPosition[3] = {0, 0, 0};  //x, y, heading in degrees
+matrix robotPosition{3, 1};  //three rows, 1 column. x, y, heading
 double previousAngleRotation = 0;
 double previousHeading = 0;
 double previousLateralTravelled = 0;
@@ -277,12 +350,12 @@ int odometry() {
   while(true) {
     //code for odometry here
     //Calculating delta values
-    double deltaLateral = (rotationalLateral.position(deg) - previousLateralTravelled) * PI / 180; //inches
-    double deltaHorizontal = (rotationalHorizontal.position(deg) - previousHorizontalTravelled) * PI / 180; //inches
+    double deltaLateral = (rotationalLateral.position(deg) - previousLateralTravelled) * radianConversion; //inches
+    double deltaHorizontal = (rotationalHorizontal.position(deg) - previousHorizontalTravelled) * radianConversion; //inches
     //gets change in orientation as an absolute value. This is for the arc angle
     double deltaOrientation = inertialSensor.rotation(deg) - previousAngleRotation; //in degrees
     double arcAngle = fabs(deltaOrientation); //in degrees
-    double arcAngleRadians = arcAngle * (PI / 180); //in radians
+    double arcAngleRadians = arcAngle * radianConversion; //in radians
     //Make a check for small changes in order to avoid sensor noise
     const double movementThreshold = 0.01; //inches
     if (fabs(deltaLateral) < movementThreshold 
@@ -313,10 +386,10 @@ int odometry() {
     }
     //Converts local changes to global changes
     double gridOffset = previousAngleRotation + (deltaOrientation / 2); //in degrees
-    double gridOffsetRadians = gridOffset * (PI / 180); //in radians
-    robotPosition[0] += localDeltaX * cos(gridOffsetRadians) - localDeltaY * sin(gridOffsetRadians);
-    robotPosition[1] += localDeltaX * sin(gridOffsetRadians) + localDeltaY * cos(gridOffsetRadians);
-    robotPosition[2] = inertialSensor.heading(deg);
+    double gridOffsetRadians = gridOffset * radianConversion; //in radians
+    robotPosition.at(0,0) += localDeltaX * cos(gridOffsetRadians) - localDeltaY * sin(gridOffsetRadians);
+    robotPosition.at(1,0) += localDeltaX * sin(gridOffsetRadians) + localDeltaY * cos(gridOffsetRadians);
+    robotPosition.at(2,0) = inertialSensor.heading(deg);
     //Updating previous values
     previousAngleRotation = inertialSensor.rotation(deg);
     previousHeading = inertialSensor.heading(deg);
@@ -332,13 +405,13 @@ int odometryTest() {
   while (true) {
   Brain.Screen.clearScreen();
   Brain.Screen.print("x: ");
-  Brain.Screen.print(robotPosition[0]);
+  Brain.Screen.print(robotPosition.at(0,0));
   Brain.Screen.newLine();
   Brain.Screen.print("y: ");
-  Brain.Screen.print(robotPosition[1]);
+  Brain.Screen.print(robotPosition.at(1,0));
   Brain.Screen.newLine();
   Brain.Screen.print("Heading: ");
-  Brain.Screen.print(robotPosition[2]);
+  Brain.Screen.print(robotPosition.at(2,0));
   Brain.Screen.newLine();
   Brain.Screen.print(rotationalLateral.position(deg));
   Brain.Screen.newLine();
@@ -355,11 +428,44 @@ int odometryTest() {
 const double zeta = 0.7; //damping coefficient
 const double b = 2.0;  //acts like a proportional gain
 
-void goTo(double desiredX, double desiredY, double desiredTheta, double velocity, double turningVelocity) {
+//values for this matrix is defined in the autonomous function
+matrix localTransformationMatrix(3,3);
+
+//Variables that controller will modify
+double leftMotorVelocity;
+double rightMotorVelocity;
+
+//Ramsete goTo function
+void goTo(double desiredX, double desiredY, double desiredTheta, double desiredLinearVelocity, double desiredTurningVelocity) {
+  //Start the while loop for the controller
+  while(true) {
   //Coordinate errors
-  double errorX = desiredX - robotPosition[0];
-  double errorY = desiredY - robotPosition[1];
-  double errorTheta = 0;
+  matrix targetPosition{3,1};
+  targetPosition.at(0,0) = desiredX;
+  targetPosition.at(1,0) = desiredY;
+  targetPosition.at(2,0) = desiredTheta;
+  matrix globalError = targetPosition.subtract(robotPosition);
+  matrix localError = localTransformationMatrix.multiply(globalError);
+  //k is a gain value for the controller that adjusts based on desired velocities
+  double k = 2 * zeta * sqrt(desiredTurningVelocity * desiredTurningVelocity + b * desiredLinearVelocity * desiredLinearVelocity);
+  double velocity = desiredLinearVelocity * cos(localError.at(2,0) * radianConversion) + k * localError.at(0,0);
+  double angleErrorTerm = localError.at(2,0) * radianConversion;
+  //Prevents division by zero when the angle error is very small
+  double sinc_term;
+  if (fabs(angleErrorTerm) < 0.001) {
+    sinc_term = 1.0;  // Limit as θ -> 0
+  } else {
+    sinc_term = sin(angleErrorTerm) / angleErrorTerm;
+  }
+  double angularVelocity = desiredTurningVelocity 
+  + b * desiredLinearVelocity * sinc_term * localError.at(1,0)
+  + k * localError.at(2,0) * radianConversion;
+  //Calculate motor power
+  double linearMotorVelocity = velocity / WHEEL_CIRCUMFERENCE;
+  leftMotorVelocity = linearMotorVelocity + angularVelocity;
+  rightMotorVelocity = linearMotorVelocity - angularVelocity;
+  }
+  vex::task::sleep(20); //waits 20 milliseconds before next loop
 }
 
 //Path Making
@@ -370,7 +476,28 @@ int path() {
   return 0;
 }
 
-//Start PID Controller
+//PID Controller for tuning velocities given by the Ramsete controller
+
+//Desired right and left velocities given by controller
+
+//PID settings start
+const double velocity_kP = 0.0;
+const double velocity_kI = 0.0;
+const double velocity_kD = 0.0;
+
+//Error variables for velocity PID
+//left side
+double leftVelocityError;
+double leftPrevVelocityError = 0;
+double leftDerivativeVelocityError;
+double leftIntegralVelocityError = 0;
+//right side
+double rightVelocityError;
+double rightPrevVelocityError = 0;
+double rightDerivativeVelocityError;
+double rightIntegralVelocityError = 0;
+
+//Start Driving Forward PID Controller
 //For going straight
 const double kP = 6;  //7
 const double kI = 0;
@@ -444,7 +571,7 @@ int drivePID() {
     //end forward movement error calculations
     // START Angular movement calculations
     headingError = desiredTurnValue - robotHeading;
-    headingError = -1 * (atan2(sin(headingError * PI /180), cos(headingError * PI / 180)) * 180.0 / PI);
+    headingError = -1 * (atan2(sin(headingError * radianConversion), cos(headingError * radianConversion)) * 180.0 / PI);
     // Derivative
     double derivativeHeadingError = (headingError - prevHeadingError) / 0.02;
 
@@ -468,7 +595,7 @@ int drivePID() {
     //(x,y) == (Rcos(theta),Rsin(theta))
     //Arc length formula (theta in deg)t: theta/180 * pi (radian conversion) * radius
     //Delta distance travelled since last reset
-    totalDistanceTravelled = rotationalLateral.position(deg) * PI / 180;  //1.375 is radius of odom wheel in inches
+    totalDistanceTravelled = rotationalLateral.position(deg) * radianConversion;
     targetDistance = targetDistance - (totalDistanceTravelled - previousDistanceTravelled);
     addDataPoint(headingError);  // Or headingError, or motorPower, etc.
     if (fabs(targetDistance) < 0.1 && fabs(headingError) < 3 && timerCount < 20) { //If within 1 inches and 3 degree of target, stop motors and exit task
@@ -635,8 +762,20 @@ void preAutonomous(void) {
 
 
 void autonomous(void) {
-  //UpperMotor forward goes right, reverse goes left
-  //IntakeMotor and Second_IM forward up, reverse down
+  //Assign values to the local transformation matrix
+  localTransformationMatrix.at(0,0) = cos(robotPosition.at(2,0) * radianConversion); //row 1, col 1
+  localTransformationMatrix.at(0,1) = sin(robotPosition.at(2,0) * radianConversion); //row 1, col 2
+  localTransformationMatrix.at(0,2) = 0; //row 1, col 3
+  localTransformationMatrix.at(1,0) = -sin(robotPosition.at(2,0) * radianConversion); //row 2, col 1
+  localTransformationMatrix.at(1,1) = cos(robotPosition.at(2,0) * radianConversion); //row 2, col 2
+  localTransformationMatrix.at(1,2) = 0; //row 2, col 3
+  localTransformationMatrix.at(2,0) = 0; //row 3, col 1
+  localTransformationMatrix.at(2,1) = 0; //row 3, col 2
+  localTransformationMatrix.at(2,2) = 1; //row 3, col 3
+  //Robot Position Vector Initialization
+  robotPosition.at(0,0) = 0; //x position in inches
+  robotPosition.at(1,0) = 0; //y position in inches
+  robotPosition.at(2,0) = 0; //heading in degrees
   rotationalHorizontal.resetPosition(); //resetting the rotational sensor position to 0
   rotationalLateral.resetPosition(); //resetting the rotational sensor position to 0
   Drivetrain.setDriveVelocity(100, percent);
@@ -650,7 +789,7 @@ void autonomous(void) {
   IntakeMotor.setStopping(brake);
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-    robotPosition[2] = 90;
+    robotPosition.at(2,0) = 90;
     inertialSensor.resetRotation();
   }
   Controller1.ButtonX.pressed(Negus);
@@ -659,82 +798,8 @@ void autonomous(void) {
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
   // place automonous code here
   // vex::task odometryTest_Thread(odometryTest);
-
   vex::task odometry_Thread(odometry);
   vex::task graph_Thread(graphTask);
-  // //drive forward 10 inches
-  // Drivetrain.driveFor(forward, 10, inches);
-  // Start PID control
-  resetPID_Sensors = true;
-  enableDrivePID = true;
-  desiredTurnValue = 180 ;
-  targetDistance = 0; //inches
-  vex::task drivePID_Thread(drivePID);
-  // while (enableDrivePID == true) {
-  //   vex::task::sleep(10);
-  // }
-  // //Next movement
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // desiredTurnValue = 110;
-  // targetDistance = 0; //inches
-  // vex::task drivePID_Thread2(drivePID);
-  // while (enableDrivePID == true) {
-  //   vex::task::sleep(10);
-  // }
-  // //Next movement
-  // maxMotorPercentage = 30;
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // desiredTurnValue = 110;
-  // targetDistance = 20; //inches
-  // vex::task drivePID_Thread3(drivePID);
-  // IntakeMotor.setVelocity(100, percent);
-  // Second_IM.setVelocity(15, percent); 
-  // UpperMotor.setVelocity(15, percent);
-  // Second_IM.spin(forward);
-  // UpperMotor.spin(forward);
-  // IntakeMotor.spin(forward);
-  // while (enableDrivePID == true) {
-  //   vex::task::sleep(10);
-  // }
-  // //Next movement
-  // maxMotorPercentage = 100;
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // desiredTurnValue = 35;
-  // targetDistance = 0; //inches
-  // vex::task drivePID_Thread4(drivePID);
-  // IntakeMotor.stop();
-  // Second_IM.stop();
-  // UpperMotor.stop();
-  // while (enableDrivePID == true) {
-  //   vex::task::sleep(10);
-  // }
-  // //Next movement
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // desiredTurnValue = 35;
-  // targetDistance = 14; //inches
-  // vex::task drivePID_Thread5(drivePID);
-  // while (enableDrivePID == true) {
-  //   vex::task::sleep(10);
-  // }
-  // //Next movement
-  // resetPID_Sensors = true;
-  // enableDrivePID = true;
-  // desiredTurnValue = 35;
-  // targetDistance = 0; //inches
-  // vex::task drivePID_Thread6(drivePID);
-  // Second_IM.setVelocity(100, percent); 
-  // UpperMotor.setVelocity(40, percent);
-  // IntakeMotor.setVelocity(50, percent);
-  // IntakeMotor.spin(reverse);
-  // Second_IM.spin(reverse);
-  // UpperMotor.spin(reverse);
-  // while (enableDrivePID == true) {
-  //   vex::task::sleep(10);
-  // }
 }
 
 void userControl(void) {
@@ -742,11 +807,11 @@ void userControl(void) {
   while (true) {
   Brain.Screen.clearScreen();
   Brain.Screen.print("x: ");
-  Brain.Screen.print(robotPosition[0]);
+  Brain.Screen.print(robotPosition.at(0,0));
   Brain.Screen.print("y: ");
-  Brain.Screen.print(robotPosition[1]);
+  Brain.Screen.print(robotPosition.at(1,0));
   Brain.Screen.print("Heading: ");
-  Brain.Screen.print(robotPosition[2]);
+  Brain.Screen.print(robotPosition.at(2,0));
   vex::task::sleep(4000);
   }
   if (inertialSensor.isCalibrating() == false) {
