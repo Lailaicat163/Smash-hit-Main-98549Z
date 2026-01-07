@@ -35,8 +35,28 @@
         <div id="add_button" class="button"><i class="fa-solid fa-plus"></i> New Point</div>
         <div id="remove_button" class="button"><i id="remove_icon" class="fa-solid fa-x"></i> Remove All</div>
         <div id="points_list"></div>
+        <div id="curve_controls">
+        <div class="control-header">Curve Controls</div>
+        <div class="slider-group">
+            <label for="maxVelocitySlider">Max Velocity (in/s):</label>
+            <input type="range" id="maxVelocitySlider" class="control-slider" min="10" max="200" value="100" step="5">
+            <span id="maxVelocityValue">100</span>
+        </div>
+            <div class="slider-group">
+                <label for="maxAccelerationSlider">Max Acceleration (in/s²):</label>
+                <input type="range" id="maxAccelerationSlider" class="control-slider" min="10" max="300" value="150" step="10">
+                <span id="maxAccelerationValue">150</span>
+            </div>
+        </div>
+        <div id="curve_list"></div>
 
-        <div id="robot"></div>
+        <div id="robot"><i class="fa-solid fa-arrow-up"></i></div>
+
+        <div class="slider-container">
+            <label for="keyFrameSlider">Animation Frame:</label>
+            <input type="range" id="keyFrameSlider" class="slider" min="0" max="0" value="0">
+            <span id="sliderValue">0</span>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>

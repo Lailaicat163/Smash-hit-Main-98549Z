@@ -121,8 +121,13 @@ int rc_auto_loop_function_Controller1() {
       // calculate the drivetrain motor velocities from the controller joystick axies
       // left = Axis3 + Axis1
       // right = Axis3 - Axis1
-      int drivetrainLeftSideSpeed = Controller1.Axis3.position() - Controller1.Axis1.position();
-      int drivetrainRightSideSpeed = Controller1.Axis3.position() + Controller1.Axis1.position();
+      // int drivetrainLeftSideSpeed = Controller1.Axis3.position() - Controller1.Axis1.position();
+      // int drivetrainRightSideSpeed = Controller1.Axis3.position() + Controller1.Axis1.position();
+      // caculates left and right side speed based on quadratic curve so it is less sensitive
+      int leftAxis = Controller1.Axis3.position();
+      int rightAxis = Controller1.Axis2.position();
+      int drivetrainLeftSideSpeed = (leftAxis * abs(leftAxis)) / 100;
+      int drivetrainRightSideSpeed = (rightAxis * abs(rightAxis)) / 100;
       
       // check if the value is inside of the deadband range
       if (drivetrainLeftSideSpeed < 5 && drivetrainLeftSideSpeed > -5) {

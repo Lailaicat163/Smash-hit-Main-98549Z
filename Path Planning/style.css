@@ -203,6 +203,77 @@ nav {
     background-color: darkgreen;
 }
 
+/* Remove the #curve_controls styles */
+
+#curve_list {
+    position: absolute;
+    top: 150px;
+    left: 920px;
+    width: 380px;
+    max-height: 550px;
+    overflow-y: auto;
+    display: none;
+}
+
+.curve-entry {
+    background-color: black;
+    border: 5px solid #444;
+    border-radius: 5px;
+    padding: 8px;
+    margin-bottom: 8px;
+    color: white;
+    font-size: 14px;
+}
+
+.curve-entry-header {
+    font-size: 16px;
+    margin-bottom: 8px;
+    color: #4CAF50;
+    border-bottom: 2px solid #444;
+    padding-bottom: 5px;
+}
+
+.curve-data {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+}
+
+.curve-data-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.curve-data-label {
+    color: #aaa;
+}
+
+.curve-data-value {
+    color: white;
+    font-weight: bold;
+}
+
+#curve_list::-webkit-scrollbar {
+    width: 10px;
+}
+
+#curve_list::-webkit-scrollbar-track {
+    background: #1a1a1a;
+    border-radius: 5px;
+}
+
+#curve_list::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 5px;
+}
+
+#curve_list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Start of Points List styling*/
+
 #points_list {
     position: absolute;
     top: 150px;
@@ -272,4 +343,64 @@ nav {
 
 .delete-point-btn:hover {
     background-color: darkred;
+}
+
+#robot {
+    position: absolute;
+    width: 54px;
+    height: 54px;
+    color: black;
+    background-color: rgba(128, 128, 128, 0.6);
+    outline: 5px solid black;
+    padding: 15px 20px;
+    transition: ease-in-out;
+}
+
+.slider-container {
+    position: absolute;
+    top: 570px;
+    left: 500px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-size: 18px;
+}
+
+.slider {
+    width: 200px;
+    height: 6px;
+    border-radius: 5px;
+    background: #ddd;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+    border: none;
+}
+
+.slider:hover {
+    background: #ccc;
+}
+
+#sliderValue {
+    color: white;
+    font-weight: bold;
+    min-width: 30px;
 }
