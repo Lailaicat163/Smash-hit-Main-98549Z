@@ -1,0 +1,275 @@
+@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap');
+
+* {
+    font-family: 'Comfortaa', cursive;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-weight: 700;
+}
+
+body {
+    background-color: navy;
+    min-height: 100vh;
+}
+
+nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    color: white;
+    background-color: black;
+    font-size: 20px;
+    padding: 15px 0 15px 0;
+    overflow: hidden;
+}
+
+.textbox {
+    color: white;
+    background-color: black;
+    width: 180px;
+    font-size: 20px;
+    font-weight: 700;
+    border: 5px solid grey;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+.textbox:focus {
+    outline: none;
+    border: 5px solid white;
+}
+
+#no_field {
+    background-color:grey;
+}
+
+#field_select {
+    color: white;
+    background-color: #030303;
+    font-size: 18px;
+    padding: 5px;
+    border-radius: 5px;
+    border: 5px solid grey;
+    outline: none;
+}
+
+.field {
+    position: absolute;
+    top: 70px;
+    left: 30px;
+    width: 432px;
+    height: 432px; 
+    margin: 20px auto;
+    border: 5px solid black;
+    border-radius: 10px;
+}
+
+.field.active {
+    display: block;
+}
+
+.field:not(.active) {
+    display: none;
+}
+
+.point {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: cyan;
+    border: none;
+    border-radius: 50%;
+    transform: translate(-50%, -50%); /* Center the point on click location */
+    pointer-events: none; /* Allow clicking through points */
+    z-index: 10;
+}
+
+.user-point {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background-color: red;
+    border: 2px solid white;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 100;
+}
+
+.curve-point {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: yellow;
+    border: 1px solid orange;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 50;
+}
+
+.control-point {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background-color: purple;
+    border: 2px solid white;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 150;
+    cursor: move;
+    pointer-events: auto;
+}
+
+.control-point:hover {
+    background-color: #9333ea;
+    border-color: yellow;
+    width: 14px;
+    height: 14px;
+}
+
+.control-point.dragging {
+    background-color: #7c3aed;
+    border-color: yellow;
+    width: 16px;
+    height: 16px;
+    box-shadow: 0 0 10px rgba(147, 51, 234, 0.8);
+}
+
+.control-line {
+    position: absolute;
+    height: 2px;
+    background-color: purple;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.user-point {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background-color: red;
+    border: 2px solid white;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 100;
+}
+
+.curve-point {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: yellow;
+    border: 1px solid orange;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 50;
+}
+
+.button {
+    position: absolute;
+    color: white;
+    font-size: 18px;
+    padding: 5px;
+    border-radius: 5px;
+    outline: none;
+    cursor: pointer;
+    transition: ease-in-out 0.2s;
+}
+
+#remove_button {
+    top: 90px;
+    left: 650px;
+    background-color: red;
+    border: 5px solid black;
+}
+
+#remove_button:hover {
+    background-color: darkred;
+}
+
+#add_button {
+    top: 90px;
+    left: 500px;
+    background-color: green;
+    border: 5px solid black;
+}
+
+#add_button:hover {
+    background-color: darkgreen;
+}
+
+#points_list {
+    position: absolute;
+    top: 150px;
+    left: 500px;
+    width: 400px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.point-entry {
+    background-color: black;
+    border: 5px solid grey;
+    border-radius: 5px;
+    padding: 10px;
+    margin-bottom: 10px;
+    color: white;
+}
+
+.point-entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 18px;
+}
+
+.point-inputs {
+    display: flex;
+    gap: 10px;
+}
+
+.input-group {
+    flex: 1;
+}
+
+.input-group label {
+    display: block;
+    font-size: 18px;
+    margin-bottom: 3px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 5px;
+    border: 5px solid grey;
+    border-radius: 5px;
+    background-color: black;
+    color: white;
+    font-size: 18px;
+    outline: none;
+}
+
+.input-group input:focus {
+    border-color: white;
+}
+
+.delete-point-btn {
+    background-color: red;
+    border: 5px solid black;
+    border-radius: 5px;
+    padding: 5px;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: ease-in-out 0.2s;
+}
+
+.delete-point-btn:hover {
+    background-color: darkred;
+}

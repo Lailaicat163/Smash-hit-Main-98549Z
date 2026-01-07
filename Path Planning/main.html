@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Path Planning</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script
+    src="https://code.jquery.com/jquery-3.7.1.js"
+    integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
+    crossorigin="anonymous"></script>
+</head>
+<body>
+    <nav>
+        <div>Vex V5 Path Planning</div>
+        <span>
+            <span>Robot Dimensions:</span>
+            <input type="text" class="textbox robot_dimensions_input" placeholder="Width (Inches)">
+            <input type="text" class="textbox robot_dimensions_input" placeholder="Height (Inches)">
+        </span>
+        <span>
+            <label for="field_select">Choose a field:</label>
+            <select name="field" id="field_select">
+            <option value="no_field" selected>None</option>
+            <option value="pushback_match">Regular Match</option>
+            <option value="pushback_skills">Skills Match</option>
+            </select>
+        </span>
+    </nav>
+    <div class="container">
+        <div id="no_field" class="field"></div>
+        <img id="pushback_match" class="field" src="pushback_match.png" alt="Pushback Match">
+        <img id="pushback_skills" class="field" src="pushback_skills.png" alt="Pushback Skills">
+        <div id="add_button" class="button"><i class="fa-solid fa-plus"></i> New Point</div>
+        <div id="remove_button" class="button"><i id="remove_icon" class="fa-solid fa-x"></i> Remove All</div>
+        <div id="points_list"></div>
+
+        <div id="robot"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

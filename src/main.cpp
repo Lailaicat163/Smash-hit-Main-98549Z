@@ -458,6 +458,32 @@ int odometryTest() {
   }
   return 0;
 }
+
+bool forwardWall;
+bool rightWall;
+bool backWall;
+bool leftWall;
+
+int distanceReset() {
+  while(true) {
+    // Returns true if there isn't a wall. Work based on this.
+    forwardWall = distanceFront.isObjectDetected();
+    rightWall = distanceFront.isObjectDetected();
+    backWall = doubleParkMacro.isObjectDetected();
+    leftWall = distanceLeft.isObjectDetected();
+
+    
+  }
+  return 0;
+}
+
+int doublePark() {
+  while(doubleParkMacro.objectDistance(inches) < 5) {
+
+  }
+  return 0;
+}
+
 //Path Following Functions
 //Ramsete Controller
 
@@ -473,7 +499,7 @@ double leftMotorVelocity;
 double rightMotorVelocity;
 
 //Ramsete goTo function
-void goTo(double desiredX, double desiredY, double desiredTheta, double desiredLinearVelocity, double desiredTurningVelocity) {
+void goTo(double desiredX, double desiredY, double desiredTheta, double desiredLinearVelocity, double desiredTurningVelocity, bool direction) {
   //Start the while loop for the controller
   while(true) {
   //Update the local transformation matrix based on current robot heading
@@ -512,15 +538,20 @@ void goTo(double desiredX, double desiredY, double desiredTheta, double desiredL
   double wheelAngularContribution = (angularVelocity * TRACK_WIDTH) / (2 * WHEEL_CIRCUMFERENCE);
   leftMotorVelocity = linearMotorVelocity + wheelAngularContribution;
   rightMotorVelocity = linearMotorVelocity - wheelAngularContribution;
+  // false is backward, true is forward
+  if (direction == false) {
+    leftMotorVelocity = -leftMotorVelocity;
+    rightMotorVelocity = -rightMotorVelocity;
   }
   vex::task::sleep(20); //waits 20 milliseconds before next loop
+  }
 }
 
 //Path Making
 
 //Path 
 int path() {
-  goTo(1,1,1,1,1);
+  goTo(1,1,1,1,1, true);
   return 0;
 }
 
