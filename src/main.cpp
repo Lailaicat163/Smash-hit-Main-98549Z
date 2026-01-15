@@ -17,6 +17,8 @@ using namespace vex;
 #define DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL 7 / 16  //inches
 #define DISTANCE_FROM_CENTER_TO_HORIZONTAL_WHEEL 3  //inches
 #define TRACK_WIDTH 10.75  //inches
+#define BUFFER 50 //Last 50 values
+
 
 // Brain should be defined by default
 brain Brain;
@@ -38,6 +40,7 @@ motor leftMotorA = motor(PORT3, ratio6_1, true);
 motor leftMotorB = motor(PORT4, ratio6_1, true);
 motor leftMotorC = motor(PORT20, ratio6_1, true);
 motor_group LeftDriveSmart = motor_group(leftMotorA, leftMotorB, leftMotorC);
+
 motor rightMotorA = motor(PORT1, ratio6_1, false);
 motor rightMotorB = motor(PORT2, ratio6_1, false);
 motor rightMotorC = motor(PORT6, ratio6_1, false);
@@ -543,6 +546,143 @@ void goTo(double desiredX, double desiredY, double desiredTheta, double desiredL
 
 //Motion Profile (contains acceleration, jerk)
 
+
+// Gets current velocity and acceleration for the robot
+int motionCounter = 0;
+int bufferIndex;
+int prevBufferIndex;
+//Velocity
+double leftRobotVelocity[BUFFER] = {};
+double rightRobotVelocity[BUFFER] = {};
+//Acceleration
+double leftRobotAcceleration[BUFFER] = {};
+double rightRobotAcceleration[BUFFER] = {};
+
+int getMotion() {
+  while(true) {
+    bufferIndex = motionCounter % BUFFER;
+    int prevBufferIndex = (bufferIndex - 1 + BUFFER) % BUFFER;
+    double dt = 0.02; //Change in time 20 milliseconds
+
+    //velocity
+    double leftVelocity = (LeftDriveSmart.velocity(rpm) / 60.0) * WHEEL_CIRCUMFERENCE * gearRatio;
+    double rightVelocity = (RightDriveSmart.velocity(rpm) / 60.0) * WHEEL_CIRCUMFERENCE * gearRatio;
+    
+    leftRobotVelocity[bufferIndex] = leftVelocity;
+    rightRobotVelocity[bufferIndex] = rightVelocity;
+
+    //acceleration delta v over delta t
+    if(motionCounter > 0) {
+    double leftAcceleration = (leftRobotVelocity[bufferIndex] - leftRobotVelocity[prevBufferIndex]) / dt;
+    double rightAcceleration = (rightRobotVelocity[bufferIndex] - rightRobotVelocity[prevBufferIndex]) / dt;
+
+    leftRobotAcceleration[bufferIndex] = leftAcceleration;
+    rightRobotAcceleration[bufferIndex] = rightAcceleration;
+    } else { //First iteration
+    leftRobotAcceleration[bufferIndex] = 0;
+    rightRobotAcceleration[bufferIndex] = 0;      
+    }
+    motionCounter++;
+    vex::task::sleep(20);
+  }
+  return 0;
+}
+
+// Get most recent velocity
+double getCurrentLeftVelocity() {
+  int index = (motionCounter - 1) % BUFFER;
+  if (index < 0) index += BUFFER;
+  return leftRobotVelocity[index];
+}
+
+// Get most recent acceleration
+double getCurrentLeftAcceleration() {
+  int index = (motionCounter - 1) % BUFFER;
+  if (index < 0) index += BUFFER;
+  return leftRobotAcceleration[index];
+}
+
+// Get most recent velocity
+double getCurrentRightVelocity() {
+  int index = (motionCounter - 1) % BUFFER;
+  if (index < 0) index += BUFFER;
+  return rightRobotVelocity[index];
+}
+
+// Get most recent acceleration
+double getCurrentRightAcceleration() {
+  int index = (motionCounter - 1) % BUFFER;
+  if (index < 0) index += BUFFER;
+  return rightRobotAcceleration[index];
+}
+
+//inches/second
+void motionProfile(double desiredLeftVelocity, double desiredRightVelocity, double maxAccel, double maxJerk) {
+  while(true) {
+    double currentLeftVelocity = getCurrentLeftVelocity();
+    double currentRightVelocity = getCurrentRightVelocity();
+    double leftVelocityError = desiredLeftVelocity - currentLeftVelocity;
+    double rightVelocityError = desiredRightVelocity - currentRightVelocity;
+    double currentLeftAccel = getCurrentLeftAcceleration();
+    double currentRightAccel = getCurrentRightAcceleration();
+    double changeInLeftAccel = leftVelocityError - currentLeftAccel;
+    double changeInRightAccel = rightVelocityError - currentLeftAccel;
+    
+    //Limiting max acceleration change
+    maxJerk = maxJerk * 0.02;
+    //Left
+    if (changeInLeftAccel > maxJerk) {
+      changeInLeftAccel = maxJerk;
+    } else if (changeInLeftAccel < -maxJerk) {
+      changeInLeftAccel = -maxJerk;
+    } else {
+      continue;
+    }
+    //Right
+    if (changeInRightAccel > maxJerk) {
+      changeInRightAccel = maxJerk;
+    } else if (changeInRightAccel < -maxJerk) {
+      changeInRightAccel = -maxJerk;
+    } else {
+      continue;
+    }
+    //Edit the current acceleration
+    currentLeftAccel += changeInLeftAccel;
+    currentRightAccel += changeInRightAccel;
+    //Set the hard cap on how much the robot can accelerate
+    //Left
+    if (currentLeftAccel > maxAccel) {
+      currentLeftAccel = maxAccel;
+    } else if (currentLeftAccel < -maxAccel) {
+      currentLeftAccel = -maxAccel;
+    } else {
+      continue;
+    }
+    //Right
+    if (currentLeftAccel > maxAccel) {
+      currentLeftAccel = maxAccel;
+    } else if (currentLeftAccel < -maxAccel) {
+      currentLeftAccel = -maxAccel;
+    } else {
+      continue;
+    }
+    //Calculate new velocity values from acceleration
+    double leftDrivetrainVelocity = currentLeftVelocity + currentLeftAccel * 0.02;
+    double rightDrivetrainVelocity = currentRightVelocity + currentRightAccel * 0.02;
+    double predictedLeftVelocity = currentLeftVelocity * 0.02 + 0.5 * currentLeftAccel * 0.004; //0.004 = to 0.02 ^ 2
+    double predictedRightVelocity = currentRightVelocity * 0.02 + 0.5 * currentRightAccel * 0.004; //0.004 = to 0.02 ^ 2
+    if (predictedLeftVelocity > desiredLeftVelocity) {
+      leftDrivetrainVelocity = desiredLeftVelocity;
+    } else if (predictedLeftVelocity < desiredLeftVelocity) {
+      leftDrivetrainVelocity = desiredLeftVelocity;
+    }
+    
+    
+
+
+
+  }
+}
 //Path Making
 
 //Path
