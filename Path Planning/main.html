@@ -6,10 +6,13 @@
     <title>Path Planning</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <script
-    src="https://code.jquery.com/jquery-3.7.1.js"
-    integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
-    crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4=" crossorigin="anonymous"></script>
+    
+    <!-- React and Recharts -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.5.0/dist/Recharts.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
     <nav>
@@ -35,20 +38,9 @@
         <div id="add_button" class="button"><i class="fa-solid fa-plus"></i> New Point</div>
         <div id="remove_button" class="button"><i id="remove_icon" class="fa-solid fa-x"></i> Remove All</div>
         <div id="points_list"></div>
-        <div id="curve_controls">
-        <div class="control-header">Curve Controls</div>
-        <div class="slider-group">
-            <label for="maxVelocitySlider">Max Velocity (in/s):</label>
-            <input type="range" id="maxVelocitySlider" class="control-slider" min="10" max="200" value="100" step="5">
-            <span id="maxVelocityValue">100</span>
-        </div>
-            <div class="slider-group">
-                <label for="maxAccelerationSlider">Max Acceleration (in/s²):</label>
-                <input type="range" id="maxAccelerationSlider" class="control-slider" min="10" max="300" value="150" step="10">
-                <span id="maxAccelerationValue">150</span>
-            </div>
-        </div>
-        <div id="curve_list"></div>
+        
+        <!-- Graph container instead of curve list -->
+        <div id="graph_container"></div>
 
         <div id="robot"><i class="fa-solid fa-arrow-up"></i></div>
 
@@ -58,6 +50,6 @@
             <span id="sliderValue">0</span>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script type="text/babel" src="script.js"></script>
 </body>
 </html>

@@ -80,8 +80,8 @@ nav {
     background-color: cyan;
     border: none;
     border-radius: 50%;
-    transform: translate(-50%, -50%); /* Center the point on click location */
-    pointer-events: none; /* Allow clicking through points */
+    transform: translate(-50%, -50%);
+    pointer-events: none;
     z-index: 10;
 }
 
@@ -146,30 +146,6 @@ nav {
     z-index: 1;
 }
 
-.user-point {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    background-color: red;
-    border: 2px solid white;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 100;
-}
-
-.curve-point {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    background-color: yellow;
-    border: 1px solid orange;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 50;
-}
-
 .button {
     position: absolute;
     color: white;
@@ -203,76 +179,48 @@ nav {
     background-color: darkgreen;
 }
 
-/* Remove the #curve_controls styles */
-
-#curve_list {
+#graph_container {
     position: absolute;
     top: 150px;
     left: 920px;
-    width: 380px;
-    max-height: 550px;
+    width: 550px;
+    max-height: 80vh;
     overflow-y: auto;
     display: none;
 }
 
-.curve-entry {
-    background-color: black;
-    border: 5px solid #444;
-    border-radius: 5px;
-    padding: 8px;
-    margin-bottom: 8px;
-    color: white;
-    font-size: 14px;
+.graph-card {
+    background-color: white;
+    border: 5px solid black;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
 }
 
-.curve-entry-header {
-    font-size: 16px;
-    margin-bottom: 8px;
-    color: #4CAF50;
-    border-bottom: 2px solid #444;
-    padding-bottom: 5px;
+.graph-title {
+    color: black;
+    font-size: 18px;
+    margin-bottom: 10px;
+    font-weight: 700;
 }
 
-.curve-data {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
-}
-
-.curve-data-item {
-    display: flex;
-    justify-content: space-between;
-    font-size: 13px;
-}
-
-.curve-data-label {
-    color: #aaa;
-}
-
-.curve-data-value {
-    color: white;
-    font-weight: bold;
-}
-
-#curve_list::-webkit-scrollbar {
+#graph_container::-webkit-scrollbar {
     width: 10px;
 }
 
-#curve_list::-webkit-scrollbar-track {
+#graph_container::-webkit-scrollbar-track {
     background: #1a1a1a;
     border-radius: 5px;
 }
 
-#curve_list::-webkit-scrollbar-thumb {
+#graph_container::-webkit-scrollbar-thumb {
     background: #444;
     border-radius: 5px;
 }
 
-#curve_list::-webkit-scrollbar-thumb:hover {
+#graph_container::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
-
-/* Start of Points List styling*/
 
 #points_list {
     position: absolute;

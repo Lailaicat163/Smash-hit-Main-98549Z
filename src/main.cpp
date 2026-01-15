@@ -46,13 +46,16 @@ drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.
    
 controller Controller1 = controller(primary);
 
-motor IntakeMotor = motor(PORT12, ratio36_1, true);
-motor UpperMotor = motor(PORT10, ratio36_1, true);
-motor Second_IM = motor(PORT14, ratio36_1, true);
+motor intakeMotorA = motor(PORT12, ratio6_1, true);
+motor intakeMotorB = motor(PORT10, ratio6_1, false);
+motor_group intakeMotor = motor_group(intakeMotorA, intakeMotorB);
 
-//Pneumatic A is for the scraper mechanism
+motor hoodMotor = motor(PORT9, ratio6_1, false);
+// Pneumatics
 digital_out scraper = digital_out(Brain.ThreeWirePort.A);
-digital_out descore = digital_out(Brain.ThreeWirePort.H);
+digital_out descore = digital_out(Brain.ThreeWirePort.B);
+digital_out hood = digital_out(Brain.ThreeWirePort.C);
+digital_out odomLift = digital_out(Brain.ThreeWirePort.D);
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
 rotation rotationalLateral = rotation(PORT13, false);
@@ -183,20 +186,6 @@ task rc_auto_loop_task_Controller1(rc_auto_loop_function_Controller1);
 //////////////////////////////////////////////
 //Quintic bezier curve path making start
 //////////////////////////////////////////////
-//First define start and end points
-//x, y
-//calculate interpolation points
-//t goes from 0 to 1
-//start and end value are for individual coordinates. For example, start x and end x.
-double getLinearInterpolationValue(double startValue, double endValue, double ratio) {
-  return startValue + (endValue - startValue) * ratio;
-}
-struct Point {
-  double x;
-  double y;
-};
-
-
 
 
 
@@ -552,13 +541,68 @@ void goTo(double desiredX, double desiredY, double desiredTheta, double desiredL
   }
 }
 
+//Motion Profile (contains acceleration, jerk)
+
 //Path Making
 
-//Path 
-int path() {
+//Path
+
+//Red
+int redDriveForwardPath() {
+  return 0;
+}
+
+int redEast1GoalPath() {
   goTo(1,1,1,1,1, true);
   return 0;
 }
+
+int redEast2GoalPath() {
+  goTo(1,1,1,1,1, true);
+  return 0;
+} 
+
+int redWest1GoalPath() {
+  goTo(1,1,1,1,1, true);
+  return 0;
+} 
+
+int redWest2GoalPath() {
+  goTo(1,1,1,1,1, true);
+  return 0;
+} 
+
+//Blue
+int blueDriveForwardPath() {
+  return 0;
+}
+
+int blueEast1GoalPath() {
+  goTo(1,1,1,1,1, true);
+  return 0;
+}
+
+int blueEast2GoalPath() {
+  goTo(1,1,1,1,1, true);
+  return 0;
+}
+
+int blueWest1GoalPath() {
+  goTo(1,1,1,1,1, true);
+  return 0;
+}
+
+int blueWest2GoalPath() {
+  goTo(1,1,1,1,1, true);
+  return 0;
+}
+
+int autoSkillsPath() {
+  goTo(1,1,1,1,1, true);
+  return 0;
+}
+
+
 
 
 //PID Controller for tuning velocities given by the Ramsete controller
@@ -756,34 +800,28 @@ bool scraperState = false;
 //then put the codes back to userc=Control
 void input() {
   if(Controller1.ButtonR2.pressing() == true){
-    IntakeMotor.setVelocity(100, percent);
-    Second_IM.setVelocity(100, percent);
-    IntakeMotor.spin(forward);
-    Second_IM.spin(forward);
+    intakeMotor.setVelocity(100, percent);
+    intakeMotor.spin(forward);
   }
   else if(Controller1.ButtonR1.pressing() == true){
-    IntakeMotor.setVelocity(50, percent);
-    Second_IM.setVelocity(50, percent);
-    IntakeMotor.spin(reverse);
-    Second_IM.spin(reverse);
+    intakeMotor.setVelocity(50, percent);
+    intakeMotor.spin(reverse);
   }
   else{
-    IntakeMotor.setVelocity(100, percent);
-    Second_IM.setVelocity(100, percent);
-    IntakeMotor.stop();
-    Second_IM.stop();
+    intakeMotor.setVelocity(100, percent);
+    intakeMotor.stop();
   }
   if(Controller1.ButtonL1.pressing() == true){
-    UpperMotor.setVelocity(50, percent);
-    UpperMotor.spin(reverse);
+    hoodMotor.setVelocity(50, percent);
+    hoodMotor.spin(reverse);
   }
   else if(Controller1.ButtonL2.pressing() == true){
-    UpperMotor.setVelocity(100, percent);
-    UpperMotor.spin(forward);
+    hoodMotor.setVelocity(100, percent);
+    hoodMotor.spin(forward);
   }
   else{
-    UpperMotor.setVelocity(100, percent);
-    UpperMotor.stop();
+    hoodMotor.setVelocity(100, percent);
+    hoodMotor.stop();
   }
 }
 // void Scraper(){
@@ -862,50 +900,333 @@ event Input;
 using namespace vex;
 
 // Begin project code
+bool isAutonomous = true;
+int xpos = -1;
+
+int trackTouch() {
+  while (isAutonomous) {
+    if (Brain.Screen.pressing()) {
+      xpos = Brain.Screen.xPosition();
+    } else {
+      xpos = -1;
+    }
+      wait(20, msec);
+  }
+  return 0;
+}
+
+char preAutonSelector;
+bool isLeft = false;
+bool isRight = false;
+
+void blueSelectGoalNumber() {
+  vex::task::sleep(400);
+  if (xpos >= 0 && xpos < 240 && isLeft == true) { // Left 1 goal
+    preAutonSelector = 'E';
+  } else if (xpos >= 240 && xpos <= 480 && isLeft == true) { // Left 2 goal
+    preAutonSelector = 'D';
+  } else if (xpos >= 0 && xpos < 240 && isRight == true) { // Right 1 goal
+    preAutonSelector = 'C';
+  } else if (xpos >= 240 && xpos <= 480 && isRight == true) { // Right 1 goal
+    preAutonSelector = 'B';
+  }
+}
+
+void redSelectGoalNumber() {
+  vex::task::sleep(400);
+  if (xpos >= 0 && xpos < 240 && isLeft == true) { // Left 1 goal
+    preAutonSelector = 'I';
+  } else if (xpos >= 240 && xpos <= 480 && isLeft == true) { // Left 2 goal
+    preAutonSelector = 'J';
+  } else if (xpos >= 0 && xpos < 240 && isRight == true) { // Right 1 goal
+    preAutonSelector = 'G';
+  } else if (xpos >= 240 && xpos <= 480 && isRight == true) { // Right 1 goal
+    preAutonSelector = 'H';
+  }
+}
+
+void blueSelect () {
+  vex::task::sleep(400);
+  if (xpos >= 0 && xpos < 160) { // For Left Side
+    Brain.Screen.clearScreen();
+    isLeft = true;
+    
+    //1 Goal Button
+    Brain.Screen.setFillColor(yellow);
+    Brain.Screen.drawRectangle(0, 0, 240, 240);
+    Brain.Screen.setCursor(5, 1);
+    Brain.Screen.print("Left 1 Goal");
+    
+    //2 Goals Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(240, 0, 240, 240);
+    Brain.Screen.setCursor(5, 24);
+    Brain.Screen.print("Left 2 Goals");
+    
+    Brain.Screen.pressed(blueSelectGoalNumber);
+  } else if (xpos >= 160 && xpos < 320) { // For Right Side
+    Brain.Screen.clearScreen();
+    isRight = true;
+    
+    //1 Goal Button
+    Brain.Screen.setFillColor(yellow);
+    Brain.Screen.drawRectangle(0, 0, 240, 240);
+    Brain.Screen.setCursor(5, 1);
+    Brain.Screen.print("Right 1 Goal");
+    
+    //2 Goals Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(240, 0, 240, 240);
+    Brain.Screen.setCursor(5, 24);
+    Brain.Screen.print("Right 2 Goals");
+    
+    Brain.Screen.pressed(blueSelectGoalNumber);
+  } else if (xpos >= 320) { // For Going Forward
+    preAutonSelector = 'A';
+  }
+}
+
+void redSelect () {
+  vex::task::sleep(400);
+  if (xpos >= 0 && xpos < 160) { // For Left Side
+    Brain.Screen.clearScreen();
+    isLeft = true;
+    
+    //1 Goal Button
+    Brain.Screen.setFillColor(yellow);
+    Brain.Screen.drawRectangle(0, 0, 240, 240);
+    Brain.Screen.setCursor(5, 1);
+    Brain.Screen.print("Left 1 Goal");
+    
+    //2 Goals Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(240, 0, 240, 240);
+    Brain.Screen.setCursor(5, 24);
+    Brain.Screen.print("Left 2 Goals");
+    
+    Brain.Screen.pressed(redSelectGoalNumber);
+  } else if (xpos >= 160 && xpos < 320) { //For Right Side
+    Brain.Screen.clearScreen();
+    isRight = true;
+    
+    //1 Goal Button
+    Brain.Screen.setFillColor(yellow);
+    Brain.Screen.drawRectangle(0, 0, 240, 240);
+    Brain.Screen.setCursor(5, 1);
+    Brain.Screen.print("Right 1 Goal");
+    
+    //2 Goals Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(240, 0, 240, 240);
+    Brain.Screen.setCursor(5, 24);
+    Brain.Screen.print("Right 2 Goals");
+    
+    Brain.Screen.pressed(redSelectGoalNumber);
+  } else if (xpos >= 320) { // For Going Forward
+    preAutonSelector = 'F';
+  }
+}
+
+void skillsSelect () {
+  vex::task::sleep(400);
+
+  if (xpos >= 0 && xpos < 240) {
+    preAutonSelector = 'L';
+  } else if (xpos >= 240 && xpos <= 480) {
+    preAutonSelector = 'K';
+  }
+}
+
+void firstPage() {
+  //Red Button
+  Brain.Screen.setFillColor(red);
+  Brain.Screen.drawRectangle(0, 0, 160, 240);
+  Brain.Screen.setCursor(5, 1);
+  Brain.Screen.print("Red Side");
+  
+  //Blue Button
+  Brain.Screen.setFillColor(blue);
+  Brain.Screen.drawRectangle(160, 0, 160, 240);
+  Brain.Screen.setCursor(5, 16);
+  Brain.Screen.print("Blue Side");
+  
+  //Skills Button
+  Brain.Screen.setFillColor(green);
+  Brain.Screen.drawRectangle(320, 0, 160, 240);
+  Brain.Screen.setCursor(5, 32);
+  Brain.Screen.print("Skills Run");
+  
+  //Check if brain pressed
+  Brain.Screen.pressed(secondPage);
+}
+
+void secondPage() {
+  vex::task::sleep(400);
+  if (xpos >= 0 && xpos < 160) { // Red Side
+    Brain.Screen.clearScreen();
+    
+    //Left Side Button
+    Brain.Screen.setFillColor(yellow);
+    Brain.Screen.drawRectangle(0, 0, 160, 240);
+    Brain.Screen.setCursor(5, 1);
+    Brain.Screen.print("Left Side");
+    
+    //Right Side Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(160, 0, 160, 240);
+    Brain.Screen.setCursor(5, 16);
+    Brain.Screen.print("Right Side");
+    
+    //Drive Forward Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(320, 0, 160, 240);
+    Brain.Screen.setCursor(5, 32);
+    Brain.Screen.print("Drive Forward");
+    
+    Brain.Screen.pressed(redSelect);
+  } else if (xpos >= 160 && xpos < 320) { // Blue Side
+    Brain.Screen.clearScreen();
+    
+    //Left Side Button
+    Brain.Screen.setFillColor(yellow);
+    Brain.Screen.drawRectangle(0, 0, 160, 240);
+    Brain.Screen.setCursor(5, 1);
+    Brain.Screen.print("Left Side");
+    
+    //Right Side Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(160, 0, 160, 240);
+    Brain.Screen.setCursor(5, 16);
+    Brain.Screen.print("Right Side");
+    
+    //Drive Forward Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(320, 0, 160, 240);
+    Brain.Screen.setCursor(5, 32);
+    Brain.Screen.print("Drive Forward");
+    
+    Brain.Screen.pressed(blueSelect);
+  } else if (xpos >= 320) { // For Skills
+    Brain.Screen.clearScreen();
+    
+    //Driver Skills Button
+    Brain.Screen.setFillColor(yellow);
+    Brain.Screen.drawRectangle(0, 0, 240, 240);
+    Brain.Screen.setCursor(5, 1);
+    Brain.Screen.print("Driver Skills");
+    
+    //Auton Skills Button
+    Brain.Screen.setFillColor(purple);
+    Brain.Screen.drawRectangle(240, 0, 240, 240);
+    Brain.Screen.setCursor(5, 24);
+    Brain.Screen.print("Auton Skills");
+    
+    Brain.Screen.pressed(skillsSelect);
+  }
+}
 
 void preAutonomous(void) {
   // actions to do when the program starts
+  //Set initial brain state
   Brain.Screen.clearScreen();
   Brain.Screen.print("pre auton code");
   Drivetrain.setDriveVelocity(100, percent);
+  
   rotationalLateral.resetPosition(); //resetting the rotational sensor position to 0
   rotationalHorizontal.resetPosition(); //resetting the rotational sensor position to 0
+  
   //calibrating the inertial sensor MUST DO THIS
-  inertialSensor.calibrate(); 
+  inertialSensor.calibrate();
   while (inertialSensor.isCalibrating()) {
     wait(100, msec);
   }
   inertialSensor.resetRotation();
+  
+  vex::task trackTouch_Thread(trackTouch);
+  //Calls auton selector
+  firstPage();
 }
-
-
 
 void autonomous(void) {
   //Robot Position Vector Initialization
   robotPosition.at(0,0) = 0; //x position in inches
   robotPosition.at(1,0) = 0; //y position in inches
   robotPosition.at(2,0) = 0; //heading in degrees
+  
   rotationalHorizontal.resetPosition(); //resetting the rotational sensor position to 0
   rotationalLateral.resetPosition(); //resetting the rotational sensor position to 0
+  
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
   Brain.Screen.print("autonomous code");
-  IntakeMotor.setVelocity(100, percent);
-  UpperMotor.setVelocity(100, percent);
-  Second_IM.setVelocity(100, percent);
-  LeftDriveSmart.setStopping(coast);
-  RightDriveSmart.setStopping(coast);
-  IntakeMotor.setStopping(brake);
+  
+  intakeMotor.setVelocity(100, percent);
+  hoodMotor.setVelocity(100, percent);
+  LeftDriveSmart.setStopping(brake);
+  RightDriveSmart.setStopping(brake);
+  intakeMotor.setStopping(coast);
+  
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
     robotPosition.at(2,0) = 90;
     inertialSensor.resetRotation();
   }
+  
   Controller1.ButtonX.pressed(Negus);
   scraperState = false;
   scraper.set(false);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+  
   // place automonous code here
+  switch (preAutonSelector) {
+    case 'A': // Blue Drive Forward
+      break;
+    case 'B': // Blue East 2 Goal
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'C': // Blue East 1 Goal
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'D': // Blue West 2 Goal
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'E': // Blue West 1 Goal
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'F': // Red Drive Forward
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'G': // Red East 1 Goal
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'H': // Red East 2 Goal
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'I': // Red West 1 Goal
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'J': // Red West 2 Goal
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'K': // Auton Skills
+      robotPosition.at(0,0) = 90;
+      robotPosition.at(0,1) = 20;
+      break;
+    case 'L': // Driver Skills
+      break;
+    default: // The default case handles invalid operators
+      break;
+  }
+  
   // vex::task odometryTest_Thread(odometryTest);
   vex::task odometry_Thread(odometry);
   vex::task graph_Thread(graphTask);
@@ -913,86 +1234,93 @@ void autonomous(void) {
 
 void userControl(void) {
   vex::task odometry_Thread(odometry);
-  while (true) {
-  Brain.Screen.clearScreen();
-  Brain.Screen.print("x: ");
-  Brain.Screen.print(robotPosition.at(0,0));
-  Brain.Screen.print("y: ");
-  Brain.Screen.print(robotPosition.at(1,0));
-  Brain.Screen.print("Heading: ");
-  Brain.Screen.print(robotPosition.at(2,0));
-  vex::task::sleep(4000);
-  }
+  isAutonomous = false;
+  
   if (inertialSensor.isCalibrating() == false) {
-    inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-    inertialSensor.resetRotation();
+      inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+      inertialSensor.resetRotation();
   }
+    
   enableDrivePID = false; //disables PID control during user control
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
   Brain.Screen.print("driver control");
-  IntakeMotor.setVelocity(100, percent);
-  UpperMotor.setVelocity(100, percent);
-  Second_IM.setVelocity(100, percent);
+    
+  intakeMotor.setVelocity(100, percent);
+  hoodMotor.setVelocity(100, percent);
   LeftDriveSmart.setStopping(coast);
   RightDriveSmart.setStopping(coast);
-  IntakeMotor.setStopping(brake);
+  intakeMotor.setStopping(brake);
+    
   // Controller1.ButtonA.pressed(Scraper);
   // Controller1.ButtonB.pressed(Descore);
   // Controller1.ButtonX.pressed(Negus);
   // Controller1.ButtonY.pressed(NoNegus);
-
+    
   LeftDriveSmart.setStopping(brake);
   RightDriveSmart.setStopping(brake);
-  IntakeMotor.setStopping(brake);
-  IntakeMotor.setVelocity(100, percent);
-  
+  intakeMotor.setStopping(brake);
+  intakeMotor.setVelocity(100, percent);
+    
   // place driver control in this while loop
-  
   bool DescoreState = false;
   bool ScrapperCooling = false;
   bool DescoreCooling = false;
-  double CoolingTime = 0;
+    
   while(true){
-    input();
-    if (Controller1.ButtonA.pressing() == true){
-      if (scraperState == true){
-      scraper.set(false);
-      scraperState = false;
-      }
-    else{
-      scraper.set(true);
-      scraperState = true;
-      }
-      ScrapperCooling = true;
-      Controller1.Screen.clearLine(1);
-      Controller1.Screen.setCursor(1,1);
-      Controller1.Screen.print("Cooling Down!");
-      wait(1, seconds);
-      Controller1.Screen.clearLine(1);
-      Controller1.Screen.setCursor(1,1);
-      ScrapperCooling = false;
+    // Display position info periodically
+    static int displayCounter = 0;
+    if (displayCounter % 400 == 0) { // Every ~4 seconds (400 * 10ms)
+      Brain.Screen.clearScreen();
+      Brain.Screen.print("x: ");
+      Brain.Screen.print(robotPosition.at(0,0));
+      Brain.Screen.print(" y: ");
+      Brain.Screen.print(robotPosition.at(1,0));
+      Brain.Screen.print(" Heading: ");
+      Brain.Screen.print(robotPosition.at(2,0));
     }
-    if (Controller1.ButtonB.pressing() == true){
+    displayCounter++;
+        
+    input();
+        
+    if (Controller1.ButtonA.pressing() && !ScrapperCooling){
+      if (scraperState == true){
+        scraper.set(false);
+        scraperState = false;
+      } else {
+        scraper.set(true);
+        scraperState = true;
+      }
+        ScrapperCooling = true;
+        Controller1.Screen.clearLine(1);
+        Controller1.Screen.setCursor(1,1);
+        Controller1.Screen.print("Cooling Down!");
+        wait(1, seconds);
+        Controller1.Screen.clearLine(1);
+        Controller1.Screen.setCursor(1,1);
+        ScrapperCooling = false;
+      }
+        
+    if (Controller1.ButtonB.pressing() && !DescoreCooling){
       if (DescoreState == true){
         descore.set(false);
         DescoreState = false;
-      }
-      else{
+      } else {
         descore.set(true);
         DescoreState = true;
       }
-      DescoreCooling = true;
-      Controller1.Screen.clearLine(1);
-      Controller1.Screen.setCursor(1,1);
-      Controller1.Screen.print("Cooling Down!");
-      wait(1, seconds);
-      Controller1.Screen.clearLine(1);
-      Controller1.Screen.setCursor(1,1);
-      DescoreCooling = false;
+        DescoreCooling = true;
+        Controller1.Screen.clearLine(1);
+        Controller1.Screen.setCursor(1,1);
+        Controller1.Screen.print("Cooling Down!");
+        wait(1, seconds);
+        Controller1.Screen.clearLine(1);
+        Controller1.Screen.setCursor(1,1);
+        DescoreCooling = false;
     }
-    vex::task::sleep(10);
-  }  
+        
+  vex::task::sleep(10);
+  }
 }
 
 int main() {
@@ -1000,9 +1328,7 @@ int main() {
   vexcodeInit();
   // create competition instance
   competition Competition;
-  IntakeMotor.setVelocity(100, percent);
-  Second_IM.setVelocity(100, percent);
-  
+  intakeMotor.setVelocity(100, percent);  
 
   // Set up callbacks for autonomous and driver control periods.
   Competition.autonomous(autonomous);

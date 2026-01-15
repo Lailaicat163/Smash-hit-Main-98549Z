@@ -4,10 +4,10 @@ const $fields = $('.field');
 const $removePointsButton = $('#remove_button');
 const $addPointButton = $('#add_button');
 const $pointsList = $('#points_list');
-let points = []; // Array to store all points
-let pointCounter = 0; // Counter for point numbers
-let controlPoints = []; // Array to store control points for each segment
-let draggingPoint = null; // Currently dragging point
+let points = [];
+let pointCounter = 0;
+let controlPoints = [];
+let draggingPoint = null;
 
 class Point {
   constructor(x, y) {
@@ -16,7 +16,6 @@ class Point {
   }
 }
 
-//Make points on quintic bezier curve
 function quinticBezier(t, p0, p1, p2, p3, p4, p5) {
   const u = 1 - t;
   const u_squared = u * u;
@@ -48,7 +47,6 @@ function quinticBezier(t, p0, p1, p2, p3, p4, p5) {
   };
 }
 
-// First derivative (velocity)
 function quinticBezierDerivative(t, p0, p1, p2, p3, p4, p5) {
     const u = 1 - t;
     const u_squared = u * u;
@@ -76,7 +74,6 @@ function quinticBezierDerivative(t, p0, p1, p2, p3, p4, p5) {
     };
 }
 
-// Second derivative (acceleration)
 function quinticBezierSecondDerivative(t, p0, p1, p2, p3, p4, p5) {
     const u = 1 - t;
     const u_squared = u * u;
@@ -102,7 +99,6 @@ function quinticBezierSecondDerivative(t, p0, p1, p2, p3, p4, p5) {
     };
 }
 
-// Third derivative (jerk)
 function quinticBezierThirdDerivative(t, p0, p1, p2, p3, p4, p5) {
     const u = 1 - t;
     const u_squared = u * u;
@@ -126,43 +122,24 @@ function quinticBezierThirdDerivative(t, p0, p1, p2, p3, p4, p5) {
 }
 
 function calculatePathProperties(t, p0, p1, p2, p3, p4, p5, dt) {
-    // Position
     const position = quinticBezier(t, p0, p1, p2, p3, p4, p5);
-    
-    // First derivative (velocity vector)
     const velocity = quinticBezierDerivative(t, p0, p1, p2, p3, p4, p5);
-    
-    // Second derivative (acceleration vector)
     const acceleration = quinticBezierSecondDerivative(t, p0, p1, p2, p3, p4, p5);
-    
-    // Third derivative (jerk vector)
     const jerk = quinticBezierThirdDerivative(t, p0, p1, p2, p3, p4, p5);
     
-    // Linear velocity (magnitude of velocity vector)
     const linearVelocity = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
-    
-    // Heading (angle of velocity vector)
     const heading = Math.atan2(velocity.y, velocity.x);
-    
-    // Curvature: κ = (x' * y'' - y' * x'') / (x'² + y'²)^(3/2)
     const curvature = (velocity.x * acceleration.y - velocity.y * acceleration.x) / 
                       Math.pow(velocity.x * velocity.x + velocity.y * velocity.y, 1.5);
     
-    // Angular velocity: ω = v * κ
     const angularVelocity = linearVelocity * curvature;
-    
-    // Linear acceleration (magnitude of acceleration vector)
     const linearAcceleration = Math.sqrt(acceleration.x * acceleration.x + 
                                          acceleration.y * acceleration.y);
     
-    // Tangential acceleration (along path direction)
     const tangentialAcceleration = (velocity.x * acceleration.x + 
                                     velocity.y * acceleration.y) / linearVelocity;
     
-    // Centripetal acceleration (perpendicular to path)
     const centripetalAcceleration = linearVelocity * linearVelocity * Math.abs(curvature);
-    
-    // Linear jerk (rate of change of acceleration)
     const linearJerk = Math.sqrt(jerk.x * jerk.x + jerk.y * jerk.y);
     
     return {
@@ -175,9 +152,9 @@ function calculatePathProperties(t, p0, p1, p2, p3, p4, p5, dt) {
         tangentialAcceleration: tangentialAcceleration,
         centripetalAcceleration: centripetalAcceleration,
         linearJerk: linearJerk,
-        velocity: velocity,        // Vector form
-        acceleration: acceleration, // Vector form
-        jerk: jerk                 // Vector form
+        velocity: velocity,
+        acceleration: acceleration,
+        jerk: jerk
     };
 }
 
@@ -186,7 +163,6 @@ function generateQuinticPathProfile() {
     
     if (points.length < 2) return pathProfile;
     
-    // For each segment in your curve
     for (let segment = 0; segment < points.length - 1; segment++) {
         const p0 = points[segment];
         const p5 = points[segment + 1];
@@ -199,7 +175,6 @@ function generateQuinticPathProfile() {
         const p3 = controls[2];
         const p4 = controls[3];
         
-        // Use the target point's max velocity and acceleration for this segment
         const segmentMaxVel = p5.maxVelocity || 100;
         const segmentMaxAccel = p5.maxAcceleration || 150;
         
@@ -211,27 +186,24 @@ function generateQuinticPathProfile() {
             
             const props = calculatePathProperties(t, p0, p1, p2, p3, p4, p5, dt);
             
-            // Skip if velocity is invalid
             if (!props.linearVelocity || isNaN(props.linearVelocity)) continue;
             
-            // Adjust velocity based on curvature
             const curvatureVelocity = segmentMaxVel / (1 + Math.abs(props.curvature) * 30);
             const targetVelocity = Math.min(segmentMaxVel, curvatureVelocity);
-            
-            // Scale velocities and accelerations
             const velocityScale = targetVelocity / (props.linearVelocity || 1);
             
             pathProfile.push({
                 x: props.position.x,
                 y: props.position.y,
-                heading: props.heading,
+                heading: props.heading * 180 / Math.PI,
                 linearVelocity: targetVelocity,
                 angularVelocity: props.angularVelocity * velocityScale,
                 curvature: props.curvature,
                 acceleration: Math.min(segmentMaxAccel, Math.abs(props.tangentialAcceleration * velocityScale)),
                 centripetalAccel: props.centripetalAcceleration,
-                jerk: props.linearJerk,
-                segment: segment
+                jerk: props.linearJerk * velocityScale,
+                segment: segment,
+                frame: pathProfile.length
             });
         }
     }
@@ -239,28 +211,23 @@ function generateQuinticPathProfile() {
     return pathProfile;
 }
 
-// Constants for field dimensions
 const FIELD_WIDTH_INCHES = 144;
 const FIELD_HEIGHT_INCHES = 144;
 
-// Function to get the active field
 function getActiveField() {
     const $active = $('.field.active');
     return $active;
 }
 
-// Function to show the selected field
 function showField() {
     $fields.removeClass('active');
     const selectedFieldId = $fieldSelect.val();
     $('#' + selectedFieldId).addClass('active');
 }
 
-// Initialize field display
 $fieldSelect.on('change', showField);
 showField();
 
-// Convert pixel coordinates to field inches
 function pixelToFieldCoords(pixelX, pixelY) {
     const $activeField = getActiveField();
     if ($activeField.length === 0) return null;
@@ -273,7 +240,6 @@ function pixelToFieldCoords(pixelX, pixelY) {
     return { x, y };
 }
 
-// Convert field inches to pixel coordinates
 function fieldToPixelCoords(x, y) {
     const $activeField = getActiveField();
     if ($activeField.length === 0) return null;
@@ -286,7 +252,6 @@ function fieldToPixelCoords(x, y) {
     return { x: pixelX, y: pixelY };
 }
 
-// Function to create visual point on the field
 function createVisualPoint(x, y, className = 'point') {
     const $activeField = getActiveField();
     
@@ -301,7 +266,6 @@ function createVisualPoint(x, y, className = 'point') {
     const pixelCoords = fieldToPixelCoords(x, y);
     if (!pixelCoords) return null;
     
-    // Create visual point
     const $point = $('<div></div>')
       .addClass(className)
       .css({
@@ -314,7 +278,6 @@ function createVisualPoint(x, y, className = 'point') {
     return $point;
 }
 
-// Function to create draggable control point
 function createControlPoint(x, y, segmentIndex, controlIndex) {
     const $controlPoint = createVisualPoint(x, y, 'control-point');
     if (!$controlPoint) return null;
@@ -323,7 +286,6 @@ function createControlPoint(x, y, segmentIndex, controlIndex) {
     $controlPoint.data('controlIndex', controlIndex);
     $controlPoint.css('pointer-events', 'auto');
     
-    // Make it draggable
     $controlPoint.on('mousedown', function(e) {
         e.preventDefault();
         draggingPoint = {
@@ -337,24 +299,20 @@ function createControlPoint(x, y, segmentIndex, controlIndex) {
     return $controlPoint;
 }
 
-// Global mouse handlers for dragging
 $(document).on('mousemove', function(e) {
     if (draggingPoint) {
         const fieldCoords = pixelToFieldCoords(e.pageX, e.pageY);
         if (!fieldCoords) return;
         
-        // Clamp to field boundaries
         fieldCoords.x = Math.max(0, Math.min(FIELD_WIDTH_INCHES, fieldCoords.x));
         fieldCoords.y = Math.max(0, Math.min(FIELD_HEIGHT_INCHES, fieldCoords.y));
         
-        // Update control point position
         const segment = controlPoints[draggingPoint.segmentIndex];
         if (segment && segment[draggingPoint.controlIndex]) {
             segment[draggingPoint.controlIndex].x = fieldCoords.x;
             segment[draggingPoint.controlIndex].y = fieldCoords.y;
         }
         
-        // Redraw everything
         updateAllVisualPoints();
     }
 });
@@ -366,12 +324,10 @@ $(document).on('mouseup', function() {
     }
 });
 
-// Initialize control points for a segment
 function initializeControlPoints(p0, p1) {
     const dx = p1.x - p0.x;
     const dy = p1.y - p0.y;
     
-    // Create 4 control points evenly spaced between start and end
     return [
         new Point(p0.x + dx * 0.2, p0.y + dy * 0.2),
         new Point(p0.x + dx * 0.4, p0.y + dy * 0.4),
@@ -382,10 +338,8 @@ function initializeControlPoints(p0, p1) {
 
 let curvePointsArray = [];
 
-// Function to draw Bézier curve with control points
 function drawBezierCurve() {
     curvePointsArray = [];
-    // Remove existing curve points
     $('.curve-point, .control-point, .control-line').remove();
     
     if (points.length < 2) {
@@ -397,7 +351,6 @@ function drawBezierCurve() {
         return;
     }
     
-    // Ensure we have control points for each segment
     while (controlPoints.length < points.length - 1) {
         const segmentIndex = controlPoints.length;
         const p0 = points[segmentIndex];
@@ -405,10 +358,8 @@ function drawBezierCurve() {
         controlPoints.push(initializeControlPoints(p0, p1));
     }
     
-    // Remove extra control points if we have fewer segments now
     controlPoints = controlPoints.slice(0, points.length - 1);
     
-    // Draw each segment
     for (let segment = 0; segment < points.length - 1; segment++) {
         const p0 = points[segment];
         const p5 = points[segment + 1];
@@ -421,20 +372,17 @@ function drawBezierCurve() {
         const p3 = controls[2];
         const p4 = controls[3];
         
-        // Draw control lines
         drawControlLine(p0.x, p0.y, p1.x, p1.y);
         drawControlLine(p1.x, p1.y, p2.x, p2.y);
         drawControlLine(p2.x, p2.y, p3.x, p3.y);
         drawControlLine(p3.x, p3.y, p4.x, p4.y);
         drawControlLine(p4.x, p4.y, p5.x, p5.y);
         
-        // Draw control points
         createControlPoint(p1.x, p1.y, segment, 0);
         createControlPoint(p2.x, p2.y, segment, 1);
         createControlPoint(p3.x, p3.y, segment, 2);
         createControlPoint(p4.x, p4.y, segment, 3);
         
-        // Draw quintic Bézier curve
         const numPoints = 100;
         for (let i = 0; i <= numPoints; i++) {
             const t = i / numPoints;
@@ -450,7 +398,6 @@ function drawBezierCurve() {
     updateCurveProfile();
 }
 
-// Draw a line between control points
 function drawControlLine(x1, y1, x2, y2) {
     const pixel1 = fieldToPixelCoords(x1, y1);
     const pixel2 = fieldToPixelCoords(x2, y2);
@@ -479,12 +426,9 @@ function drawControlLine(x1, y1, x2, y2) {
     $('body').append($line);
 }
 
-// Function to update all visual points
 function updateAllVisualPoints() {
-    // Remove all existing points
     $('.point, .curve-point, .control-point, .control-line, .user-point').remove();
     
-    // Create visual points for all entries
     $('.point-entry').each(function() {
         const x = parseFloat($(this).find('.input-x').val());
         const y = parseFloat($(this).find('.input-y').val());
@@ -494,11 +438,9 @@ function updateAllVisualPoints() {
         }
     });
     
-    // Draw curve with control points
     drawBezierCurve();
 }
 
-// Function to create a new point entry
 function createPointEntry(x = '', y = '', heading = '', maxVel = 100, maxAccel = 150) {
     pointCounter++;
     const pointId = `point-${pointCounter}`;
@@ -545,7 +487,6 @@ function createPointEntry(x = '', y = '', heading = '', maxVel = 100, maxAccel =
         const index = $('.point-entry').index($pointEntry);
         $pointEntry.remove();
         
-        // Remove associated control points
         if (index < controlPoints.length) {
             controlPoints.splice(index, 1);
         }
@@ -566,8 +507,6 @@ function createPointEntry(x = '', y = '', heading = '', maxVel = 100, maxAccel =
     updateAllVisualPoints();
 }
 
-// Function to update points array
-// Function to update points array
 function updatePointsArray() {
     points = [];
     $('.point-entry').each(function() {
@@ -587,44 +526,27 @@ function updatePointsArray() {
     });
 }
 
-// Add button click handler
 $addPointButton.on('click', function() {
     createPointEntry();
 });
 
-// Remove all points
-// Update the existing remove button click handler
 $removePointsButton.on('click', function() {
     points = [];
     controlPoints = [];
     pointCounter = 0;
     $pointsList.empty();
     $('.point, .curve-point, .control-point, .control-line, .user-point').remove();
-    $('#curve_list').hide(); // ADD THIS
-    $('#curve_controls').hide(); // ADD THIS
+    $('#graph_container').hide();
 });
 
-// Update visual points when field changes
 $fieldSelect.on('change', function() {
     showField();
     updateAllVisualPoints();
 });
 
-//Start robot animation
-
-//Gets user input on robot dimensions
-function getRobotDimensions() {
-    const width = parseFloat($('.robot_dimensions_input').eq(0).val()) || 18;
-    const height = parseFloat($('.robot_dimensions_input').eq(1).val()) || 18;
-    
-    return { width, height };
-}
-
-//Start robot animation
 let currentFrame = 0;
 const robot = $('#robot');
 
-//Gets user input on robot dimensions
 function getRobotDimensions() {
     const width = parseFloat($('.robot_dimensions_input').eq(0).val()) || 18;
     const height = parseFloat($('.robot_dimensions_input').eq(1).val()) || 18;
@@ -644,7 +566,6 @@ function calculateHeading(fromPoint, toPoint) {
 
 let curveHeadingAngles = [];
 
-//Calculates heading at each curve point
 function curveHeadingCalculation() {
     curveHeadingAngles = [];
     for(let i = 0; i < curvePointsArray.length - 1; i++) {
@@ -684,7 +605,6 @@ function updateRobot(frame) {
     });
 }
 
-// Update slider range when curve changes
 function updateSliderRange() {
     const maxFrame = Math.max(0, curvePointsArray.length - 1);
     $('#keyFrameSlider').attr('max', maxFrame);
@@ -698,7 +618,6 @@ function updateSliderRange() {
     updateRobot(0);
 }
 
-// Slider input handler
 $('#keyFrameSlider').on('input', function() {
     currentFrame = parseInt($(this).val());
     const maxFrame = parseInt($(this).attr('max'));
@@ -706,122 +625,148 @@ $('#keyFrameSlider').on('input', function() {
     updateRobot(currentFrame);
 });
 
-// Update robot size when dimensions change
 $('.robot_dimensions_input').on('input', function() {
     setRobotSize();
 });
 
-// Curve profile variable
-let curveProfile = [];
-
-// Generate and display curve profile
-function updateCurveProfile() {
-    const $curveList = $('#curve_list');
+// Function to create a single graph
+function createGraph(containerId, data, dataKey, title, yLabel, color = '#2196F3') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
     
-    // Hide if less than 2 points
+    const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = window.Recharts;
+    
+    const element = React.createElement(ResponsiveContainer, { width: '100%', height: 250 },
+        React.createElement(LineChart, { 
+            data: data, 
+            margin: { top: 5, right: 20, bottom: 5, left: 20 }
+        },
+            React.createElement(CartesianGrid, { strokeDasharray: '3 3' }),
+            React.createElement(XAxis, { 
+                dataKey: 'frame',
+                label: { value: 'Frame', position: 'insideBottom', offset: -5 }
+            }),
+            React.createElement(YAxis, { 
+                label: { value: yLabel, angle: -90, position: 'insideLeft' }
+            }),
+            React.createElement(Tooltip),
+            React.createElement(Legend),
+            React.createElement(Line, { 
+                type: 'monotone', 
+                dataKey: dataKey, 
+                stroke: color, 
+                strokeWidth: 2,
+                dot: false,
+                name: title
+            })
+        )
+    );
+    
+    const root = ReactDOM.createRoot(container);
+    root.render(element);
+}
+
+// Function to create XY scatter plot
+function createXYPlot(containerId, data) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = window.Recharts;
+    
+    const element = React.createElement(ResponsiveContainer, { width: '100%', height: 300 },
+        React.createElement(ScatterChart, { 
+            margin: { top: 10, right: 20, bottom: 20, left: 20 }
+        },
+            React.createElement(CartesianGrid, { strokeDasharray: '3 3' }),
+            React.createElement(XAxis, { 
+                type: 'number', 
+                dataKey: 'x', 
+                name: 'X', 
+                unit: ' in',
+                domain: [0, 144]
+            }),
+            React.createElement(YAxis, { 
+                type: 'number', 
+                dataKey: 'y', 
+                name: 'Y', 
+                unit: ' in',
+                domain: [0, 144]
+            }),
+            React.createElement(Tooltip, { cursor: { strokeDasharray: '3 3' } }),
+            React.createElement(Scatter, { 
+                name: 'Path', 
+                data: data, 
+                fill: '#2196F3',
+                line: { stroke: '#2196F3', strokeWidth: 2 }
+            })
+        )
+    );
+    
+    const root = ReactDOM.createRoot(container);
+    root.render(element);
+}
+
+function updateCurveProfile() {
+    const $graphContainer = $('#graph_container');
+    
     if (points.length < 2 || curvePointsArray.length === 0) {
-        $curveList.hide();
+        $graphContainer.hide();
         return;
     }
     
-    // Show list
-    $curveList.show().empty();
+    $graphContainer.show().empty();
     
-    // Generate profile
-    curveProfile = generateQuinticPathProfile();
+    const curveProfile = generateQuinticPathProfile();
     
     if (curveProfile.length === 0) {
-        $curveList.hide();
+        $graphContainer.hide();
         return;
     }
     
-    // Group by segment
-    const segmentGroups = {};
-    curveProfile.forEach(point => {
-        if (!segmentGroups[point.segment]) {
-            segmentGroups[point.segment] = [];
-        }
-        segmentGroups[point.segment].push(point);
-    });
+    // Create HTML structure for all graphs
+    const graphsHTML = `
+        <div class="graph-card">
+            <div class="graph-title">Path Trajectory (X vs Y)</div>
+            <div id="graph-xy"></div>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">Linear Velocity</div>
+            <div id="graph-velocity"></div>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">Angular Velocity</div>
+            <div id="graph-angular"></div>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">Path Curvature</div>
+            <div id="graph-curvature"></div>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">Acceleration</div>
+            <div id="graph-acceleration"></div>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">Jerk</div>
+            <div id="graph-jerk"></div>
+        </div>
+        <div class="graph-card">
+            <div class="graph-title">Robot Heading</div>
+            <div id="graph-heading"></div>
+        </div>
+    `;
     
-    // Display each segment
-    Object.keys(segmentGroups).forEach(segmentIndex => {
-        const segmentPoints = segmentGroups[segmentIndex];
-        const displayInterval = Math.max(1, Math.floor(segmentPoints.length / 20));
-        
-        // Segment header
-        const $segmentHeader = $('<div></div>')
-            .addClass('curve-entry')
-            .css({
-                'background-color': '#1a3a1a',
-                'border-color': '#4CAF50'
-            })
-            .html(`
-                <div class="curve-entry-header">
-                    Segment ${parseInt(segmentIndex) + 1} 
-                    (Point ${parseInt(segmentIndex) + 1} → ${parseInt(segmentIndex) + 2})
-                </div>
-                <div class="curve-data">
-                    <div class="curve-data-item">
-                        <span class="curve-data-label">Points:</span>
-                        <span class="curve-data-value">${segmentPoints.length}</span>
-                    </div>
-                    <div class="curve-data-item">
-                        <span class="curve-data-label">Max Vel:</span>
-                        <span class="curve-data-value">${points[parseInt(segmentIndex) + 1].maxVelocity} in/s</span>
-                    </div>
-                </div>
-            `);
-        
-        $curveList.append($segmentHeader);
-        
-        // Display sample points from segment
-        for (let i = 0; i < segmentPoints.length; i += displayInterval) {
-            const point = segmentPoints[i];
-            
-            const $curveEntry = $('<div></div>')
-                .addClass('curve-entry')
-                .html(`
-                    <div class="curve-entry-header">Frame ${curveProfile.indexOf(point)}</div>
-                    <div class="curve-data">
-                        <div class="curve-data-item">
-                            <span class="curve-data-label">X:</span>
-                            <span class="curve-data-value">${point.x.toFixed(2)}"</span>
-                        </div>
-                        <div class="curve-data-item">
-                            <span class="curve-data-label">Y:</span>
-                            <span class="curve-data-value">${point.y.toFixed(2)}"</span>
-                        </div>
-                        <div class="curve-data-item">
-                            <span class="curve-data-label">Heading:</span>
-                            <span class="curve-data-value">${(point.heading * 180 / Math.PI).toFixed(1)}°</span>
-                        </div>
-                        <div class="curve-data-item">
-                            <span class="curve-data-label">Velocity:</span>
-                            <span class="curve-data-value">${point.linearVelocity.toFixed(1)} in/s</span>
-                        </div>
-                        <div class="curve-data-item">
-                            <span class="curve-data-label">ω:</span>
-                            <span class="curve-data-value">${point.angularVelocity.toFixed(3)} rad/s</span>
-                        </div>
-                        <div class="curve-data-item">
-                            <span class="curve-data-label">κ:</span>
-                            <span class="curve-data-value">${point.curvature.toFixed(4)}</span>
-                        </div>
-                        <div class="curve-data-item">
-                            <span class="curve-data-label">Accel:</span>
-                            <span class="curve-data-value">${point.acceleration.toFixed(1)} in/s²</span>
-                        </div>
-                        <div class="curve-data-item">
-                            <span class="curve-data-label">Centrip:</span>
-                            <span class="curve-data-value">${point.centripetalAccel.toFixed(1)} in/s²</span>
-                        </div>
-                    </div>
-                `);
-            
-            $curveList.append($curveEntry);
-        }
-    });
+    $graphContainer.html(graphsHTML);
+    
+    // Wait for DOM to be ready, then create graphs
+    setTimeout(() => {
+        createXYPlot('graph-xy', curveProfile);
+        createGraph('graph-velocity', curveProfile, 'linearVelocity', 'Velocity', 'Velocity (in/s)');
+        createGraph('graph-angular', curveProfile, 'angularVelocity', 'Angular Velocity', 'ω (rad/s)');
+        createGraph('graph-curvature', curveProfile, 'curvature', 'Curvature', 'κ');
+        createGraph('graph-acceleration', curveProfile, 'acceleration', 'Acceleration', 'Accel (in/s²)');
+        createGraph('graph-jerk', curveProfile, 'jerk', 'Jerk', 'Jerk (in/s³)');
+        createGraph('graph-heading', curveProfile, 'heading', 'Heading', 'Heading (°)');
+    }, 100);
 }
 
 }); // End of $(document).ready
