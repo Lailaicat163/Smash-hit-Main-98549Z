@@ -63,8 +63,8 @@ motor hoodMotor = motor(PORT4, ratio6_1, false);
 
 
 // Pneumatics
-//Digital in is scraper digital out is odomLift
-digital_out scraper_odomLift = digital_out(Brain.ThreeWirePort.A);
+//Digital in is scraper
+digital_out scraper = digital_out(Brain.ThreeWirePort.A);
 //Digital in is descore and digital out is hood
 digital_out descore_hood = digital_out(Brain.ThreeWirePort.B);
 
@@ -515,7 +515,7 @@ double desiredTurningVelocity = 0;
 bool direction = false;
 
 //Ramsete ramseteControl function
-int ramseteControl(double desiredX, double desiredY, double desiredTheta, double desiredLinearVelocity, double desiredTurningVelocity, bool direction) {
+int ramseteControl() {
   //Start the while loop for the controller
   while(true) {
   //Update the local transformation matrix based on current robot heading
@@ -735,6 +735,149 @@ int motionProfile() {
   return 0;
 }
 
+//testing max acceleration and jerk then printing it on brain screen
+// Add these functions to your code
+
+// Test function to find maximum acceleration
+void testMaxAcceleration() {
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("Testing Max Acceleration...");
+  
+  // Reset position and stop motors
+  LeftDriveSmart.stop();
+  RightDriveSmart.stop();
+  wait(500, msec);
+  
+  // Arrays to store velocity samples
+  const int samples = 100;
+  double velocities[samples];
+  double timeStamps[samples];
+  
+  // Record start time
+  double startTime = Brain.Timer.time(msec);
+  
+  // Apply full power and collect velocity data
+  LeftDriveSmart.spin(forward, 100, percent);
+  RightDriveSmart.spin(forward, 100, percent);
+  
+  for(int i = 0; i < samples; i++) {
+    timeStamps[i] = (Brain.Timer.time(msec) - startTime) / 1000.0; // Convert to seconds
+    double leftVel = (LeftDriveSmart.velocity(rpm) / 60.0) * WHEEL_CIRCUMFERENCE * gearRatio;
+    double rightVel = (RightDriveSmart.velocity(rpm) / 60.0) * WHEEL_CIRCUMFERENCE * gearRatio;
+    velocities[i] = (leftVel + rightVel) / 2.0; // Average velocity in inches/sec
+    wait(20, msec);
+  }
+  
+  // Stop motors
+  LeftDriveSmart.stop();
+  RightDriveSmart.stop();
+  
+  // Calculate maximum acceleration (change in velocity / change in time)
+  double maxAccel = 0;
+  for(int i = 1; i < samples; i++) {
+    double dt = timeStamps[i] - timeStamps[i-1];
+    if(dt > 0) {
+      double accel = (velocities[i] - velocities[i-1]) / dt;
+      if(accel > maxAccel) {
+        maxAccel = accel;
+      }
+    }
+  }
+  
+  // Display result
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("Max Acceleration: ");
+  Brain.Screen.print(maxAccel);
+  Brain.Screen.print(" in/s²");
+  wait(3, seconds);
+}
+
+// Test function to find maximum jerk
+void testMaxJerk() {
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("Testing Max Jerk...");
+  
+  // Reset position and stop motors
+  LeftDriveSmart.stop();
+  RightDriveSmart.stop();
+  wait(500, msec);
+  
+  // Arrays to store acceleration samples
+  const int samples = 100;
+  double accelerations[samples];
+  double timeStamps[samples];
+  double velocities[samples];
+  
+  // Record start time
+  double startTime = Brain.Timer.time(msec);
+  
+  // Apply full power and collect velocity data
+  LeftDriveSmart.spin(forward, 100, percent);
+  RightDriveSmart.spin(forward, 100, percent);
+  
+  // First pass: collect velocities
+  for(int i = 0; i < samples; i++) {
+    timeStamps[i] = (Brain.Timer.time(msec) - startTime) / 1000.0; // Convert to seconds
+    double leftVel = (LeftDriveSmart.velocity(rpm) / 60.0) * WHEEL_CIRCUMFERENCE * gearRatio;
+    double rightVel = (RightDriveSmart.velocity(rpm) / 60.0) * WHEEL_CIRCUMFERENCE * gearRatio;
+    velocities[i] = (leftVel + rightVel) / 2.0; // Average velocity in inches/sec
+    wait(20, msec);
+  }
+  
+  // Stop motors
+  LeftDriveSmart.stop();
+  RightDriveSmart.stop();
+  
+  // Second pass: calculate accelerations
+  for(int i = 1; i < samples; i++) {
+    double dt = timeStamps[i] - timeStamps[i-1];
+    if(dt > 0) {
+      accelerations[i] = (velocities[i] - velocities[i-1]) / dt;
+    } else {
+      accelerations[i] = 0;
+    }
+  }
+  accelerations[0] = 0; // First sample has no previous data
+  
+  // Third pass: calculate maximum jerk (change in acceleration / change in time)
+  double maxJerk = 0;
+  for(int i = 2; i < samples; i++) {
+    double dt = timeStamps[i] - timeStamps[i-1];
+    if(dt > 0) {
+      double jerk = (accelerations[i] - accelerations[i-1]) / dt;
+      if(fabs(jerk) > maxJerk) {
+        maxJerk = fabs(jerk);
+      }
+    }
+  }
+  
+  // Display result
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("Max Jerk: ");
+  Brain.Screen.print(maxJerk);
+  Brain.Screen.print(" in/s³");
+  wait(3, seconds);
+}
+
+// Combined test function that runs both tests
+void testMotionLimits() {
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("Starting Motion Tests...");
+  wait(1, seconds);
+  
+  // Test acceleration
+  testMaxAcceleration();
+  
+  // Wait between tests
+  wait(1, seconds);
+  
+  // Test jerk
+  testMaxJerk();
+  
+  Brain.Screen.clearScreen();
+  Brain.Screen.print("Motion tests complete!");
+}
+
 
 //go to function for path making
 void goTo(double x, double y, double heading, double linearVelocity, double turningVelocity, bool forward) {
@@ -774,6 +917,14 @@ void goTo(double x, double y, double heading, double linearVelocity, double turn
 
 //Path
 
+void setStartPosition(double x, double y, double heading) {
+  robotPosition.at(0,0) = x;
+  robotPosition.at(0,1) = y;
+  robotPosition.at(0,2) = heading;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+}
+
 //Red
 int redDriveForwardPath() {
   Drivetrain.driveFor(4, vex::distanceUnits::in);
@@ -781,44 +932,28 @@ int redDriveForwardPath() {
 }
 
 int redEast1GoalPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int redEast2GoalPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);  
   return 0;
 } 
 
 int redWest1GoalPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);  
   return 0;
 } 
 
 int redWest2GoalPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
@@ -831,55 +966,35 @@ int blueDriveForwardPath() {
 }
 
 int blueEast1GoalPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int blueEast2GoalPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int blueWest1GoalPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int blueWest2GoalPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int autoSkillsPath() {
-  robotPosition.at(0,0) = 90;
-  robotPosition.at(0,1) = 20;
-  robotPosition.at(0,2) = 90;
-  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
-  vex::task ramseteTask();
+  setStartPosition(20, 90, 90);
   //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
@@ -1071,62 +1186,45 @@ int drivePID() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 //Controller input functions start here
-
+bool descoreState = false;
 bool scraperState = false;
+bool hoodState = false;
 
-//following codes are for input purpose, if there are some bugs exist, 
-//then put the codes back to userc=Control
-void input() {
-  if(Controller1.ButtonR1.pressing() == true){
-    intakeMotor.setVelocity(100, percent);
-    intakeMotor.spin(forward);
-  }
-  else if(Controller1.ButtonR2.pressing() == true){
-    intakeMotor.setVelocity(100, percent);
-    intakeMotor.spin(reverse);
-  }
-  else{
-    intakeMotor.setVelocity(100, percent);
-    intakeMotor.stop();
+void Scraper(){
+    // wait(10, msec);
+    //false for pushing and pulling
+    if (scraperState == true){
+      scraper.set(false);
+      scraperState = false;
+    }
+    else{
+      scraper.set(false);
+      scraperState = true;
+    }
   }
 
-  if(Controller1.ButtonL1.pressing() == true){
-    hoodMotor.setVelocity(50, percent);
-    hoodMotor.spin(reverse);
-  }
-  else if(Controller1.ButtonL2.pressing() == true){
-    hoodMotor.setVelocity(100, percent);
-    hoodMotor.spin(forward);
+void Descore(){
+  if (descoreState == true){
+    descore_hood.set(false);
+    descoreState = false;
   }
   else{
-    hoodMotor.setVelocity(100, percent);
-    hoodMotor.stop();
+    descore_hood.set(false);
+    descoreState = true;
   }
 }
-// void Scraper(){
-//     // wait(10, msec);
-//     if (scraperState == true){
-//       scraper.set(false);
-//       scraperState = false;
-//     }
-//     else{
-//       scraper.set(true);
-//       scraperState = true;
-//     }
-//   }
 
-// bool DescoreState = false;
+void hoodStopper(){
+  if (hoodState == true) {
+    descore_hood.set(true);
+    hoodState = false;
+  }
+  else{
+    descore_hood.set(true);
+    hoodState = true;
+  }
+}
 
-// void Descore(){
-//   if (DescoreState == true){
-//     descore.set(false);
-//     DescoreState = false;
-//   }
-//   else{
-//     descore.set(true);
-//     DescoreState = true;
-//   }
-// }
 
 bool NegusConfirmed = false;
 
@@ -1145,7 +1243,7 @@ void Negus(){
   }
 }
 
-void NoNegus(){
+void NoNegus(){  
   if (NegusConfirmed == true){
     Controller1.Screen.clearLine(1);
     Controller1.Screen.setCursor(1,1);
@@ -1155,6 +1253,76 @@ void NoNegus(){
     Controller1.Screen.clearLine(1);
   }
 }
+
+//following codes are for input purpose, if there are some bugs exist, 
+//then put the codes back to userc=Control
+void input() {
+  if(Controller1.ButtonR1.pressing() == true){ //Intake forward and reverse button
+    intakeMotor.setVelocity(100, percent);
+    intakeMotor.spin(forward);
+    hoodMotor.spin(forward);
+  }
+  else if(Controller1.ButtonR2.pressing() == true){
+    intakeMotor.setVelocity(100, percent);
+    intakeMotor.spin(reverse);
+    hoodMotor.spin(reverse);
+  }
+  else{
+    intakeMotor.setVelocity(100, percent);
+    intakeMotor.stop();
+  }
+  //Long goal and slow down buttons
+  if(Controller1.ButtonL1.pressing() == true){
+    intakeMotor.spin(forward);
+    intakeMotor.spin(forward);
+  }
+  else if(Controller1.ButtonL2.pressing() == true){
+    intakeMotor.setVelocity(50, percent);
+    hoodMotor.setVelocity(50, percent);
+  }
+  else{
+    intakeMotor.setVelocity(100, percent);
+    hoodMotor.setVelocity(100, percent);
+  }
+  //Pneumatic buttons
+if (Controller1.ButtonA.pressing() && !ScrapperCooling){
+      if (scraperState == true){
+        scraper.set(false);
+        scraperState = false;
+      } else {
+        scraper.set(true);
+        scraperState = true;
+      }
+        ScrapperCooling = true;
+        Controller1.Screen.clearLine(1);
+        Controller1.Screen.setCursor(1,1);
+        Controller1.Screen.print("Cooling Down!");
+        wait(1, seconds);
+        Controller1.Screen.clearLine(1);
+        Controller1.Screen.setCursor(1,1);
+        ScrapperCooling = false;
+      }
+        
+    if (Controller1.ButtonB.pressing() && !DescoreCooling){
+      if (descoreState == true){
+        descore_hood.set(false);
+        DescoreState = false;
+      } else {
+        descore_hood.set(true);
+        DescoreState = true;
+      }
+        DescoreCooling = true;
+        Controller1.Screen.clearLine(1);
+        Controller1.Screen.setCursor(1,1);
+        Controller1.Screen.print("Cooling Down!");
+        wait(1, seconds);
+        Controller1.Screen.clearLine(1);
+        Controller1.Screen.setCursor(1,1);
+        DescoreCooling = false;
+    }
+}
+
+
 //trrestrest
 
 event Input;
@@ -1453,7 +1621,7 @@ void autonomous(void) {
   
   Controller1.ButtonX.pressed(Negus);
   scraperState = false;
-  scraper_odomLift.set(false);
+  scraper.set(false);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
 
   // vex::task odometryTest_Thread(odometryTest);
@@ -1555,42 +1723,8 @@ void userControl(void) {
     displayCounter++;
         
     input();
-        
-    if (Controller1.ButtonA.pressing() && !ScrapperCooling){
-      if (scraperState == true){
-        scraper_odomLift.set(false);
-        scraperState = false;
-      } else {
-        scraper_odomLift.set(true);
-        scraperState = true;
-      }
-        ScrapperCooling = true;
-        Controller1.Screen.clearLine(1);
-        Controller1.Screen.setCursor(1,1);
-        Controller1.Screen.print("Cooling Down!");
-        wait(1, seconds);
-        Controller1.Screen.clearLine(1);
-        Controller1.Screen.setCursor(1,1);
-        ScrapperCooling = false;
-      }
-        
-    if (Controller1.ButtonB.pressing() && !DescoreCooling){
-      if (DescoreState == true){
-        descore_hood.set(false);
-        DescoreState = false;
-      } else {
-        descore_hood.set(true);
-        DescoreState = true;
-      }
-        DescoreCooling = true;
-        Controller1.Screen.clearLine(1);
-        Controller1.Screen.setCursor(1,1);
-        Controller1.Screen.print("Cooling Down!");
-        wait(1, seconds);
-        Controller1.Screen.clearLine(1);
-        Controller1.Screen.setCursor(1,1);
-        DescoreCooling = false;
-    }
+
+    testMotionLimits();
         
   vex::task::sleep(10);
   }
