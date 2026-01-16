@@ -36,29 +36,37 @@ brain Brain;
 
 
 // Robot configuration code.
-motor leftMotorA = motor(PORT3, ratio6_1, true);
-motor leftMotorB = motor(PORT4, ratio6_1, true);
-motor leftMotorC = motor(PORT20, ratio6_1, true);
+motor leftMotorA = motor(PORT12, ratio6_1, false);
+motor leftMotorB = motor(PORT14, ratio6_1, false);
+motor leftMotorC = motor(PORT13, ratio6_1, false); //5.5 watt
 motor_group LeftDriveSmart = motor_group(leftMotorA, leftMotorB, leftMotorC);
 
-motor rightMotorA = motor(PORT1, ratio6_1, false);
-motor rightMotorB = motor(PORT2, ratio6_1, false);
-motor rightMotorC = motor(PORT6, ratio6_1, false);
+motor rightMotorA = motor(PORT15, ratio6_1, true);
+motor rightMotorB = motor(PORT19, ratio6_1, true);
+motor rightMotorC = motor(PORT18, ratio6_1, true); //5.5 watt
 motor_group RightDriveSmart = motor_group(rightMotorA, rightMotorB, rightMotorC);
 drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.7, 190.5, mm, 1);
    
 controller Controller1 = controller(primary);
 
-motor intakeMotorA = motor(PORT12, ratio6_1, true);
-motor intakeMotorB = motor(PORT10, ratio6_1, false);
+motor intakeMotorA = motor(PORT2, ratio6_1, true);
+motor intakeMotorB = motor(PORT3, ratio6_1, false);
 motor_group intakeMotor = motor_group(intakeMotorA, intakeMotorB);
 
-motor hoodMotor = motor(PORT9, ratio6_1, false);
+motor hoodMotor = motor(PORT4, ratio6_1, false);
+
+
+
+
+
+
+
+
 // Pneumatics
-digital_out scraper = digital_out(Brain.ThreeWirePort.A);
-digital_out descore = digital_out(Brain.ThreeWirePort.B);
-digital_out hood = digital_out(Brain.ThreeWirePort.C);
-digital_out odomLift = digital_out(Brain.ThreeWirePort.D);
+//Digital in is scraper digital out is odomLift
+digital_out scraper_odomLift = digital_out(Brain.ThreeWirePort.A);
+//Digital in is descore and digital out is hood
+digital_out descore_hood = digital_out(Brain.ThreeWirePort.B);
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
 rotation rotationalLateral = rotation(PORT13, false);
@@ -81,6 +89,10 @@ float maxMotorPercentage = 100.0;
 double radianConversion = PI / 180.0; //conversion factor from degrees to radians
 //Sets gear ratio
 double gearRatio = 3 / 5; // input gear teeth / output gear teeth
+
+//Set motion variables
+double maxAcceleration = 15;
+double maxJerk = 15;
 
 // controller Controller2 = controller(partner);
 
@@ -492,11 +504,18 @@ const double b = 2.0;  //acts like a proportional gain
 matrix localTransformationMatrix(3,3);
 
 //Variables that controller will modify
-double leftMotorVelocity;
-double rightMotorVelocity;
+double leftMotorVelocity = 0;
+double rightMotorVelocity = 0;
 
-//Ramsete goTo function
-void goTo(double desiredX, double desiredY, double desiredTheta, double desiredLinearVelocity, double desiredTurningVelocity, bool direction) {
+double desiredX;
+double desiredY;
+double desiredTheta;
+double desiredLinearVelocity = 0;
+double desiredTurningVelocity = 0;
+bool direction = false;
+
+//Ramsete ramseteControl function
+int ramseteControl(double desiredX, double desiredY, double desiredTheta, double desiredLinearVelocity, double desiredTurningVelocity, bool direction) {
   //Start the while loop for the controller
   while(true) {
   //Update the local transformation matrix based on current robot heading
@@ -542,6 +561,7 @@ void goTo(double desiredX, double desiredY, double desiredTheta, double desiredL
   }
   vex::task::sleep(20); //waits 20 milliseconds before next loop
   }
+  return 0;
 }
 
 //Motion Profile (contains acceleration, jerk)
@@ -617,71 +637,138 @@ double getCurrentRightAcceleration() {
 }
 
 //inches/second
-void motionProfile(double desiredLeftVelocity, double desiredRightVelocity, double maxAccel, double maxJerk) {
+int motionProfile() {
+  // Track target accelerations that evolve over time
+  double targetLeftAccel = 0;
+  double targetRightAccel = 0;
+  
   while(true) {
     double currentLeftVelocity = getCurrentLeftVelocity();
     double currentRightVelocity = getCurrentRightVelocity();
-    double leftVelocityError = desiredLeftVelocity - currentLeftVelocity;
-    double rightVelocityError = desiredRightVelocity - currentRightVelocity;
-    double currentLeftAccel = getCurrentLeftAcceleration();
-    double currentRightAccel = getCurrentRightAcceleration();
-    double changeInLeftAccel = leftVelocityError - currentLeftAccel;
-    double changeInRightAccel = rightVelocityError - currentLeftAccel;
+    double leftVelocityError = leftMotorVelocity - currentLeftVelocity;
+    double rightVelocityError = rightMotorVelocity - currentRightVelocity;
+
+    // Check if we're close enough to target - if so, just idle
+    if (fabs(leftVelocityError) <= 0.1 && fabs(rightVelocityError) <= 0.1) {
+      // Reset target accelerations when at target
+      targetLeftAccel = 0;
+      targetRightAccel = 0;
+      vex::task::sleep(20);
+      continue; // Skip the rest and just sleep
+    }
     
-    //Limiting max acceleration change
-    maxJerk = maxJerk * 0.02;
-    //Left
-    if (changeInLeftAccel > maxJerk) {
-      changeInLeftAccel = maxJerk;
-    } else if (changeInLeftAccel < -maxJerk) {
-      changeInLeftAccel = -maxJerk;
-    } else {
-      continue;
+    double dt = 0.02; // 20ms time step
+    
+    // Calculate what acceleration we need to reach target velocity
+    double desiredLeftAccel = leftVelocityError / dt;
+    double desiredRightAccel = rightVelocityError / dt;
+    
+    // Calculate how much we need to change our current target acceleration
+    double leftAccelChange = desiredLeftAccel - targetLeftAccel;
+    double rightAccelChange = desiredRightAccel - targetRightAccel;
+    
+    // Apply jerk limiting (max change in acceleration per time step)
+    double maxJerkStep = maxJerk * dt;
+    
+    //Left jerk limiting
+    if (leftAccelChange > maxJerkStep) {
+      leftAccelChange = maxJerkStep;
+    } else if (leftAccelChange < -maxJerkStep) {
+      leftAccelChange = -maxJerkStep;
     }
-    //Right
-    if (changeInRightAccel > maxJerk) {
-      changeInRightAccel = maxJerk;
-    } else if (changeInRightAccel < -maxJerk) {
-      changeInRightAccel = -maxJerk;
-    } else {
-      continue;
+    
+    //Right jerk limiting
+    if (rightAccelChange > maxJerkStep) {
+      rightAccelChange = maxJerkStep;
+    } else if (rightAccelChange < -maxJerkStep) {
+      rightAccelChange = -maxJerkStep;
     }
-    //Edit the current acceleration
-    currentLeftAccel += changeInLeftAccel;
-    currentRightAccel += changeInRightAccel;
+    
+    //Update target accelerations
+    targetLeftAccel += leftAccelChange;
+    targetRightAccel += rightAccelChange;
+    
     //Set the hard cap on how much the robot can accelerate
     //Left
-    if (currentLeftAccel > maxAccel) {
-      currentLeftAccel = maxAccel;
-    } else if (currentLeftAccel < -maxAccel) {
-      currentLeftAccel = -maxAccel;
-    } else {
-      continue;
+    if (targetLeftAccel > maxAcceleration) {
+      targetLeftAccel = maxAcceleration;
+    } else if (targetLeftAccel < -maxAcceleration) {
+      targetLeftAccel = -maxAcceleration;
     }
+    
     //Right
-    if (currentLeftAccel > maxAccel) {
-      currentLeftAccel = maxAccel;
-    } else if (currentLeftAccel < -maxAccel) {
-      currentLeftAccel = -maxAccel;
-    } else {
-      continue;
+    if (targetRightAccel > maxAcceleration) {
+      targetRightAccel = maxAcceleration;
+    } else if (targetRightAccel < -maxAcceleration) {
+      targetRightAccel = -maxAcceleration;
     }
+    
     //Calculate new velocity values from acceleration
-    double leftDrivetrainVelocity = currentLeftVelocity + currentLeftAccel * 0.02;
-    double rightDrivetrainVelocity = currentRightVelocity + currentRightAccel * 0.02;
-    double predictedLeftVelocity = currentLeftVelocity * 0.02 + 0.5 * currentLeftAccel * 0.004; //0.004 = to 0.02 ^ 2
-    double predictedRightVelocity = currentRightVelocity * 0.02 + 0.5 * currentRightAccel * 0.004; //0.004 = to 0.02 ^ 2
-    if (predictedLeftVelocity > desiredLeftVelocity) {
-      leftDrivetrainVelocity = desiredLeftVelocity;
-    } else if (predictedLeftVelocity < desiredLeftVelocity) {
-      leftDrivetrainVelocity = desiredLeftVelocity;
+    double commandedLeftVelocity = currentLeftVelocity + targetLeftAccel * dt;
+    double commandedRightVelocity = currentRightVelocity + targetRightAccel * dt;
+    
+    //Clamp to not overshoot target velocity
+    //Left side clamping
+    if (leftVelocityError > 0 && commandedLeftVelocity > leftMotorVelocity) {
+      commandedLeftVelocity = leftMotorVelocity;
+    } else if (leftVelocityError < 0 && commandedLeftVelocity < leftMotorVelocity) {
+      commandedLeftVelocity = leftMotorVelocity;
     }
     
+    //Right side clamping
+    if (rightVelocityError > 0 && commandedRightVelocity > rightMotorVelocity) {
+      commandedRightVelocity = rightMotorVelocity;
+    } else if (rightVelocityError < 0 && commandedRightVelocity < rightMotorVelocity) {
+      commandedRightVelocity = rightMotorVelocity;
+    }
     
-
-
-
+    //percent conversions (600 RPM = 100% for 11-watt motors)
+    commandedLeftVelocity = (((commandedLeftVelocity / WHEEL_CIRCUMFERENCE) * 60.0 / gearRatio) / 600.0) * 100.0; // Convert to percent
+    commandedRightVelocity = (((commandedRightVelocity / WHEEL_CIRCUMFERENCE) * 60.0 / gearRatio) / 600.0) * 100.0; // Convert to percent
+    
+    //Command motors
+    LeftDriveSmart.spin(forward, commandedLeftVelocity, vex::percentUnits::pct);
+    RightDriveSmart.spin(forward, commandedRightVelocity, vex::percentUnits::pct);
+    
+    vex::task::sleep(20);
   }
+  return 0;
+}
+
+
+//go to function for path making
+void goTo(double x, double y, double heading, double linearVelocity, double turningVelocity, bool forward) {
+  desiredX = x;
+  desiredY = y;
+  desiredTheta = heading;
+  desiredLinearVelocity = linearVelocity;
+  desiredTurningVelocity = turningVelocity;
+  direction = forward;
+
+  // Wait until we reach the target
+  while(true) {
+    double xError = desiredX - robotPosition.at(0,0);
+    double yError = desiredY - robotPosition.at(1,0);
+    double positionError = sqrt(xError * xError + yError * yError);
+    
+    // Calculate heading error properly (wraps around 360 degrees)
+    double headingError = desiredTheta - robotPosition.at(2,0);
+    // Normalize to [-180, 180] range
+    headingError = atan2(sin(headingError * radianConversion), cos(headingError * radianConversion)) / radianConversion;
+    headingError = fabs(headingError);
+    
+    // Check if we've reached target
+    if (positionError < 0.5 && headingError < 2.0) { // Within 0.5 inches and 2 degrees
+      break;
+    }
+
+    vex::task::sleep(20);
+  }
+  
+  // Stops at target
+  desiredLinearVelocity = 0;
+  desiredTurningVelocity = 0;
+  vex::task::sleep(100); //Let robot come still
 }
 //Path Making
 
@@ -689,55 +776,111 @@ void motionProfile(double desiredLeftVelocity, double desiredRightVelocity, doub
 
 //Red
 int redDriveForwardPath() {
+  Drivetrain.driveFor(4, vex::distanceUnits::in);
   return 0;
 }
 
 int redEast1GoalPath() {
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int redEast2GoalPath() {
-  goTo(1,1,1,1,1, true);
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
+  goTo(1,1,1,1,1, true);  
   return 0;
 } 
 
 int redWest1GoalPath() {
-  goTo(1,1,1,1,1, true);
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
+  goTo(1,1,1,1,1, true);  
   return 0;
 } 
 
 int redWest2GoalPath() {
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 } 
 
 //Blue
 int blueDriveForwardPath() {
+  Drivetrain.driveFor(4, vex::distanceUnits::in);
   return 0;
 }
 
 int blueEast1GoalPath() {
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int blueEast2GoalPath() {
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int blueWest1GoalPath() {
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int blueWest2GoalPath() {
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
 
 int autoSkillsPath() {
+  robotPosition.at(0,0) = 90;
+  robotPosition.at(0,1) = 20;
+  robotPosition.at(0,2) = 90;
+  goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+  vex::task ramseteTask();
+  //Start Path (x, y, heading, linear velocity, angular velocity, isForward)
   goTo(1,1,1,1,1, true);
   return 0;
 }
@@ -926,11 +1069,6 @@ int drivePID() {
   return 1; //Doesn't matter what this returns
 }
 
-
-
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////
 //Controller input functions start here
 
@@ -939,18 +1077,19 @@ bool scraperState = false;
 //following codes are for input purpose, if there are some bugs exist, 
 //then put the codes back to userc=Control
 void input() {
-  if(Controller1.ButtonR2.pressing() == true){
+  if(Controller1.ButtonR1.pressing() == true){
     intakeMotor.setVelocity(100, percent);
     intakeMotor.spin(forward);
   }
-  else if(Controller1.ButtonR1.pressing() == true){
-    intakeMotor.setVelocity(50, percent);
+  else if(Controller1.ButtonR2.pressing() == true){
+    intakeMotor.setVelocity(100, percent);
     intakeMotor.spin(reverse);
   }
   else{
     intakeMotor.setVelocity(100, percent);
     intakeMotor.stop();
   }
+
   if(Controller1.ButtonL1.pressing() == true){
     hoodMotor.setVelocity(50, percent);
     hoodMotor.spin(reverse);
@@ -1177,29 +1316,6 @@ void skillsSelect () {
   }
 }
 
-void firstPage() {
-  //Red Button
-  Brain.Screen.setFillColor(red);
-  Brain.Screen.drawRectangle(0, 0, 160, 240);
-  Brain.Screen.setCursor(5, 1);
-  Brain.Screen.print("Red Side");
-  
-  //Blue Button
-  Brain.Screen.setFillColor(blue);
-  Brain.Screen.drawRectangle(160, 0, 160, 240);
-  Brain.Screen.setCursor(5, 16);
-  Brain.Screen.print("Blue Side");
-  
-  //Skills Button
-  Brain.Screen.setFillColor(green);
-  Brain.Screen.drawRectangle(320, 0, 160, 240);
-  Brain.Screen.setCursor(5, 32);
-  Brain.Screen.print("Skills Run");
-  
-  //Check if brain pressed
-  Brain.Screen.pressed(secondPage);
-}
-
 void secondPage() {
   vex::task::sleep(400);
   if (xpos >= 0 && xpos < 160) { // Red Side
@@ -1265,6 +1381,29 @@ void secondPage() {
   }
 }
 
+void firstPage() {
+  //Red Button
+  Brain.Screen.setFillColor(red);
+  Brain.Screen.drawRectangle(0, 0, 160, 240);
+  Brain.Screen.setCursor(5, 1);
+  Brain.Screen.print("Red Side");
+  
+  //Blue Button
+  Brain.Screen.setFillColor(blue);
+  Brain.Screen.drawRectangle(160, 0, 160, 240);
+  Brain.Screen.setCursor(5, 16);
+  Brain.Screen.print("Blue Side");
+  
+  //Skills Button
+  Brain.Screen.setFillColor(green);
+  Brain.Screen.drawRectangle(320, 0, 160, 240);
+  Brain.Screen.setCursor(5, 32);
+  Brain.Screen.print("Skills Run");
+  
+  //Check if brain pressed
+  Brain.Screen.pressed(secondPage);
+}
+
 void preAutonomous(void) {
   // actions to do when the program starts
   //Set initial brain state
@@ -1314,52 +1453,49 @@ void autonomous(void) {
   
   Controller1.ButtonX.pressed(Negus);
   scraperState = false;
-  scraper.set(false);
+  scraper_odomLift.set(false);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+
+  // vex::task odometryTest_Thread(odometryTest);
+  vex::task odometry_Thread(odometry);
+  vex::task getMotion_Thread(getMotion); // Start motion tracking
+  vex::task motionProfile_Thread(motionProfile); // Start motion profile
+  vex::task graph_Thread(graphTask);
   
   // place automonous code here
   switch (preAutonSelector) {
     case 'A': // Blue Drive Forward
+      blueDriveForwardPath();
       break;
-    case 'B': // Blue East 2 Goal
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+    case 'B': // Blue East 1 Goal
+      blueEast1GoalPath();
       break;
-    case 'C': // Blue East 1 Goal
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+    case 'C': // Blue East 2 Goal
+      blueEast2GoalPath();
       break;
-    case 'D': // Blue West 2 Goal
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+    case 'D': // Blue West 1 Goal
+      blueWest1GoalPath();
       break;
-    case 'E': // Blue West 1 Goal
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+    case 'E': // Blue West 2 Goal
+      blueWest2GoalPath();
       break;
     case 'F': // Red Drive Forward
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+      redDriveForwardPath();
       break;
     case 'G': // Red East 1 Goal
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+      redEast1GoalPath();
       break;
     case 'H': // Red East 2 Goal
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+      redEast2GoalPath();
       break;
     case 'I': // Red West 1 Goal
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+      redWest1GoalPath();
       break;
     case 'J': // Red West 2 Goal
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+      redWest2GoalPath();
       break;
     case 'K': // Auton Skills
-      robotPosition.at(0,0) = 90;
-      robotPosition.at(0,1) = 20;
+      autoSkillsPath();
       break;
     case 'L': // Driver Skills
       break;
@@ -1367,9 +1503,6 @@ void autonomous(void) {
       break;
   }
   
-  // vex::task odometryTest_Thread(odometryTest);
-  vex::task odometry_Thread(odometry);
-  vex::task graph_Thread(graphTask);
 }
 
 void userControl(void) {
@@ -1425,10 +1558,10 @@ void userControl(void) {
         
     if (Controller1.ButtonA.pressing() && !ScrapperCooling){
       if (scraperState == true){
-        scraper.set(false);
+        scraper_odomLift.set(false);
         scraperState = false;
       } else {
-        scraper.set(true);
+        scraper_odomLift.set(true);
         scraperState = true;
       }
         ScrapperCooling = true;
@@ -1443,10 +1576,10 @@ void userControl(void) {
         
     if (Controller1.ButtonB.pressing() && !DescoreCooling){
       if (DescoreState == true){
-        descore.set(false);
+        descore_hood.set(false);
         DescoreState = false;
       } else {
-        descore.set(true);
+        descore_hood.set(true);
         DescoreState = true;
       }
         DescoreCooling = true;
