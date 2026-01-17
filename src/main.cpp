@@ -36,46 +36,39 @@ brain Brain;
 
 
 // Robot configuration code.
-motor leftMotorA = motor(PORT12, ratio6_1, false);
-motor leftMotorB = motor(PORT14, ratio6_1, false);
-motor leftMotorC = motor(PORT13, ratio6_1, false); //5.5 watt
+motor leftMotorA = motor(PORT12, ratio6_1, true);
+motor leftMotorB = motor(PORT14, ratio6_1, true);
+motor leftMotorC = motor(PORT13, ratio6_1, true); //5.5 watt
 motor_group LeftDriveSmart = motor_group(leftMotorA, leftMotorB, leftMotorC);
 
-motor rightMotorA = motor(PORT15, ratio6_1, true);
-motor rightMotorB = motor(PORT19, ratio6_1, true);
-motor rightMotorC = motor(PORT18, ratio6_1, true); //5.5 watt
+motor rightMotorA = motor(PORT15, ratio6_1, false);
+motor rightMotorB = motor(PORT19, ratio6_1, false);
+motor rightMotorC = motor(PORT18, ratio6_1, false); //5.5 watt
 motor_group RightDriveSmart = motor_group(rightMotorA, rightMotorB, rightMotorC);
 drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.7, 190.5, mm, 1);
    
 controller Controller1 = controller(primary);
 
-motor intakeMotorA = motor(PORT2, ratio6_1, true);
-motor intakeMotorB = motor(PORT3, ratio6_1, false);
+motor intakeMotorA = motor(PORT2, ratio6_1, false);
+motor intakeMotorB = motor(PORT3, ratio6_1, true);
 motor_group intakeMotor = motor_group(intakeMotorA, intakeMotorB);
 
-motor hoodMotor = motor(PORT4, ratio6_1, false);
-
-
-
-
-
-
-
+motor hoodMotor = motor(PORT11, ratio6_1, true);
 
 // Pneumatics
 //Digital in is scraper
-digital_out scraper = digital_out(Brain.ThreeWirePort.A);
+digital_out scraper_descore = digital_out(Brain.ThreeWirePort.H);
 //Digital in is descore and digital out is hood
-digital_out descore_hood = digital_out(Brain.ThreeWirePort.B);
+digital_out hood = digital_out(Brain.ThreeWirePort.A);
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
-rotation rotationalLateral = rotation(PORT13, false);
-rotation rotationalHorizontal = rotation(PORT18, true);
+rotation rotationalLateral = rotation(PORT20, false);
+rotation rotationalHorizontal = rotation(PORT4, true);
 
 //Initializes the inertial sensor. starts from 0 degrees and increases by turning clockwise.
-inertial inertialSensor = inertial(PORT14);
+inertial inertialSensor = inertial(PORT5);
 
-//Initializes the distance sensors (4)
+// //Initializes the distance sensors (4)
 distance distanceFront = distance(PORT15);
 distance distanceLeft = distance(PORT16);
 distance distanceRight = distance(PORT17);
@@ -139,13 +132,16 @@ int rc_auto_loop_function_Controller1() {
       // calculate the drivetrain motor velocities from the controller joystick axies
       // left = Axis3 + Axis1
       // right = Axis3 - Axis1
-      // int drivetrainLeftSideSpeed = Controller1.Axis3.position() - Controller1.Axis1.position();
-      // int drivetrainRightSideSpeed = Controller1.Axis3.position() + Controller1.Axis1.position();
+      int left = Controller1.Axis3.position() + Controller1.Axis1.position();
+      int right = Controller1.Axis3.position() - Controller1.Axis1.position();
+
+      int drivetrainLeftSideSpeed = (left * abs(left)) / 100;
+      int drivetrainRightSideSpeed = (right * abs(right)) / 100;
       // caculates left and right side speed based on quadratic curve so it is less sensitive
-      int leftAxis = Controller1.Axis3.position();
-      int rightAxis = Controller1.Axis2.position();
-      int drivetrainLeftSideSpeed = (leftAxis * abs(leftAxis)) / 100;
-      int drivetrainRightSideSpeed = (rightAxis * abs(rightAxis)) / 100;
+      // int leftAxis = Controller1.Axis3.position();
+      // int rightAxis = Controller1.Axis2.position();
+      // int drivetrainLeftSideSpeed = (leftAxis * abs(leftAxis)) / 100;
+      // int drivetrainRightSideSpeed = (rightAxis * abs(rightAxis)) / 100;
       
       // check if the value is inside of the deadband range
       if (drivetrainLeftSideSpeed < 5 && drivetrainLeftSideSpeed > -5) {
@@ -1194,37 +1190,44 @@ void Scraper(){
     // wait(10, msec);
     //false for pushing and pulling
     if (scraperState == true){
-      scraper.set(false);
+      scraper_descore.set(true);
       scraperState = false;
     }
     else{
-      scraper.set(false);
+      scraper_descore.set(true);
       scraperState = true;
     }
   }
 
 void Descore(){
   if (descoreState == true){
-    descore_hood.set(false);
+    hood.set(false);
     descoreState = false;
   }
   else{
-    descore_hood.set(false);
+    hood.set(false);
     descoreState = true;
   }
 }
 
 void hoodStopper(){
   if (hoodState == true) {
-    descore_hood.set(true);
+    hood.set(true);
     hoodState = false;
   }
   else{
-    descore_hood.set(true);
+    hood.set(true);
     hoodState = true;
   }
 }
 
+bool DescoreState = false;
+bool ScrapperCooling = false;
+bool DescoreCooling = false;
+bool hoodCooling = false;
+
+bool slowMode = false;
+    
 
 bool NegusConfirmed = false;
 
@@ -1257,69 +1260,75 @@ void NoNegus(){
 //following codes are for input purpose, if there are some bugs exist, 
 //then put the codes back to userc=Control
 void input() {
-  if(Controller1.ButtonR1.pressing() == true){ //Intake forward and reverse button
+  // Intake control - R1 forward, R2 reverse
+  if(Controller1.ButtonR1.pressing()) {
     intakeMotor.setVelocity(100, percent);
+    hoodMotor.setVelocity(100, percent);
     intakeMotor.spin(forward);
     hoodMotor.spin(forward);
-  }
-  else if(Controller1.ButtonR2.pressing() == true){
+  } 
+  else if(Controller1.ButtonR2.pressing()) {  // Changed to 'else if'
     intakeMotor.setVelocity(100, percent);
+    hoodMotor.setVelocity(100, percent);
+    if (slowMode) {
+      intakeMotor.setVelocity(50, percent);
+      hoodMotor.setVelocity(50, percent);
+    }
     intakeMotor.spin(reverse);
     hoodMotor.spin(reverse);
   }
-  else{
-    intakeMotor.setVelocity(100, percent);
+  else {  // Only stop if neither button is pressed
     intakeMotor.stop();
+    hoodMotor.stop();
   }
-  //Long goal and slow down buttons
-  if(Controller1.ButtonL1.pressing() == true){
-    intakeMotor.spin(forward);
-    intakeMotor.spin(forward);
-  }
-  else if(Controller1.ButtonL2.pressing() == true){
+  
+  // L2 for slow mode
+  if(Controller1.ButtonL2.pressing()) {
     intakeMotor.setVelocity(50, percent);
     hoodMotor.setVelocity(50, percent);
+    slowMode = true;
+  } else {
+    slowMode = false;
   }
-  else{
+  
+  // Scraper toggle with L1
+  if(Controller1.ButtonL1.pressing()) {
+    Scraper();
+  }
+  
+  // Descore toggle with X button
+  if(Controller1.ButtonX.pressing()) {
+    Descore();
+  }
+  
+  // Scoring buttons
+  if(Controller1.ButtonUp.pressing()) {
     intakeMotor.setVelocity(100, percent);
     hoodMotor.setVelocity(100, percent);
+    intakeMotor.spin(forward);
+    hoodMotor.spin(forward);
   }
-  //Pneumatic buttons
-if (Controller1.ButtonA.pressing() && !ScrapperCooling){
-      if (scraperState == true){
-        scraper.set(false);
-        scraperState = false;
-      } else {
-        scraper.set(true);
-        scraperState = true;
-      }
-        ScrapperCooling = true;
-        Controller1.Screen.clearLine(1);
-        Controller1.Screen.setCursor(1,1);
-        Controller1.Screen.print("Cooling Down!");
-        wait(1, seconds);
-        Controller1.Screen.clearLine(1);
-        Controller1.Screen.setCursor(1,1);
-        ScrapperCooling = false;
-      }
-        
-    if (Controller1.ButtonB.pressing() && !DescoreCooling){
-      if (descoreState == true){
-        descore_hood.set(false);
-        DescoreState = false;
-      } else {
-        descore_hood.set(true);
-        DescoreState = true;
-      }
-        DescoreCooling = true;
-        Controller1.Screen.clearLine(1);
-        Controller1.Screen.setCursor(1,1);
-        Controller1.Screen.print("Cooling Down!");
-        wait(1, seconds);
-        Controller1.Screen.clearLine(1);
-        Controller1.Screen.setCursor(1,1);
-        DescoreCooling = false;
+  else if(Controller1.ButtonLeft.pressing()) {
+    intakeMotor.setVelocity(100, percent);
+    hoodMotor.setVelocity(100, percent);
+    if (slowMode) {
+      intakeMotor.setVelocity(50, percent);
+      hoodMotor.setVelocity(50, percent);
     }
+    intakeMotor.spin(forward);
+    hoodMotor.spin(reverse);
+    
+    if(hoodState) {
+      hoodStopper();
+    }
+  }
+  else if(!Controller1.ButtonR1.pressing() && !Controller1.ButtonR2.pressing()) {
+    // Only reset hood state if no other buttons controlling motors are pressed
+    if(hoodState) {
+      hood.set(true);
+      hoodState = false;
+    }
+  }
 }
 
 
@@ -1611,7 +1620,8 @@ void autonomous(void) {
   hoodMotor.setVelocity(100, percent);
   LeftDriveSmart.setStopping(brake);
   RightDriveSmart.setStopping(brake);
-  intakeMotor.setStopping(coast);
+  intakeMotor.setStopping(brake);
+  hoodMotor.setStopping(brake);
   
   if (inertialSensor.isCalibrating() == false) {
     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
@@ -1621,49 +1631,60 @@ void autonomous(void) {
   
   Controller1.ButtonX.pressed(Negus);
   scraperState = false;
-  scraper.set(false);
+  scraper_descore.set(false);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
 
   // vex::task odometryTest_Thread(odometryTest);
   vex::task odometry_Thread(odometry);
   vex::task getMotion_Thread(getMotion); // Start motion tracking
   vex::task motionProfile_Thread(motionProfile); // Start motion profile
-  vex::task graph_Thread(graphTask);
+  //vex::task graph_Thread(graphTask);
   
   // place automonous code here
   switch (preAutonSelector) {
     case 'A': // Blue Drive Forward
       blueDriveForwardPath();
+      isAutonomous = false;
       break;
     case 'B': // Blue East 1 Goal
       blueEast1GoalPath();
+      isAutonomous = false;
       break;
     case 'C': // Blue East 2 Goal
       blueEast2GoalPath();
+      isAutonomous = false;
       break;
     case 'D': // Blue West 1 Goal
       blueWest1GoalPath();
+      isAutonomous = false;
       break;
     case 'E': // Blue West 2 Goal
       blueWest2GoalPath();
+      isAutonomous = false;
       break;
     case 'F': // Red Drive Forward
       redDriveForwardPath();
+      isAutonomous = false;
       break;
     case 'G': // Red East 1 Goal
       redEast1GoalPath();
+      isAutonomous = false;
       break;
     case 'H': // Red East 2 Goal
       redEast2GoalPath();
+      isAutonomous = false;
       break;
     case 'I': // Red West 1 Goal
       redWest1GoalPath();
+      isAutonomous = false;
       break;
     case 'J': // Red West 2 Goal
       redWest2GoalPath();
+      isAutonomous = false;
       break;
     case 'K': // Auton Skills
       autoSkillsPath();
+      isAutonomous = false;
       break;
     case 'L': // Driver Skills
       break;
@@ -1675,13 +1696,11 @@ void autonomous(void) {
 
 void userControl(void) {
   vex::task odometry_Thread(odometry);
-  isAutonomous = false;
-  
   if (inertialSensor.isCalibrating() == false) {
       inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
       inertialSensor.resetRotation();
   }
-    
+  hoodStopper();  
   enableDrivePID = false; //disables PID control during user control
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
@@ -1689,42 +1708,37 @@ void userControl(void) {
     
   intakeMotor.setVelocity(100, percent);
   hoodMotor.setVelocity(100, percent);
-  LeftDriveSmart.setStopping(coast);
-  RightDriveSmart.setStopping(coast);
+  LeftDriveSmart.setStopping(brake);
+  RightDriveSmart.setStopping(brake);
   intakeMotor.setStopping(brake);
     
   // Controller1.ButtonA.pressed(Scraper);
   // Controller1.ButtonB.pressed(Descore);
   // Controller1.ButtonX.pressed(Negus);
   // Controller1.ButtonY.pressed(NoNegus);
-    
-  LeftDriveSmart.setStopping(brake);
-  RightDriveSmart.setStopping(brake);
+  hoodMotor.setStopping(brake);
   intakeMotor.setStopping(brake);
   intakeMotor.setVelocity(100, percent);
     
   // place driver control in this while loop
-  bool DescoreState = false;
-  bool ScrapperCooling = false;
-  bool DescoreCooling = false;
-    
+
   while(true){
     // Display position info periodically
-    static int displayCounter = 0;
-    if (displayCounter % 400 == 0) { // Every ~4 seconds (400 * 10ms)
-      Brain.Screen.clearScreen();
-      Brain.Screen.print("x: ");
-      Brain.Screen.print(robotPosition.at(0,0));
-      Brain.Screen.print(" y: ");
-      Brain.Screen.print(robotPosition.at(1,0));
-      Brain.Screen.print(" Heading: ");
-      Brain.Screen.print(robotPosition.at(2,0));
-    }
-    displayCounter++;
+    // static int displayCounter = 0;
+    // if (displayCounter % 400 == 0) { // Every ~4 seconds (400 * 10ms)
+    //   Brain.Screen.clearScreen();
+    //   Brain.Screen.print("x: ");
+    //   Brain.Screen.print(robotPosition.at(0,0));
+    //   Brain.Screen.print(" y: ");
+    //   Brain.Screen.print(robotPosition.at(1,0));
+    //   Brain.Screen.print(" Heading: ");
+    //   Brain.Screen.print(robotPosition.at(2,0));
+    // }
+    // displayCounter++;
         
     input();
 
-    testMotionLimits();
+    //testMotionLimits();
         
   vex::task::sleep(10);
   }
