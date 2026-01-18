@@ -50,17 +50,17 @@ drivetrain Drivetrain = drivetrain(LeftDriveSmart, RightDriveSmart, 299.24, 266.
 controller Controller1 = controller(primary);
 
 motor intakeMotorA = motor(PORT2, ratio6_1, false);
-motor intakeMotorB = motor(PORT3, ratio6_1, true);
+motor intakeMotorB = motor(PORT17, ratio6_1, true);
 motor_group intakeMotor = motor_group(intakeMotorA, intakeMotorB);
 
 motor hoodMotor = motor(PORT11, ratio6_1, true);
 
 // Pneumatics
 //Digital in is scraper
-digital_out scraper_descore = digital_out(Brain.ThreeWirePort.H);
+digital_out descore = digital_out(Brain.ThreeWirePort.H);
 //Digital in is descore and digital out is hood
 digital_out hood = digital_out(Brain.ThreeWirePort.A);
-
+digital_out scraper = digital_out(Brain.ThreeWirePort.F);
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
 rotation rotationalLateral = rotation(PORT20, false);
 rotation rotationalHorizontal = rotation(PORT4, true);
@@ -1187,32 +1187,30 @@ bool scraperState = false;
 bool hoodState = false;
 
 void Scraper(){
-    // wait(10, msec);
-    //false for pushing and pulling
     if (scraperState == true){
-      scraper_descore.set(true);
+      scraper.set(false);
       scraperState = false;
     }
     else{
-      scraper_descore.set(true);
+      scraper.set(true);
       scraperState = true;
     }
-  }
+}
 
 void Descore(){
   if (descoreState == true){
-    hood.set(false);
+    descore.set(false);
     descoreState = false;
   }
   else{
-    hood.set(false);
+    descore.set(true);
     descoreState = true;
   }
 }
 
 void hoodStopper(){
   if (hoodState == true) {
-    hood.set(true);
+    hood.set(false);
     hoodState = false;
   }
   else{
@@ -1260,6 +1258,10 @@ void NoNegus(){
 //following codes are for input purpose, if there are some bugs exist, 
 //then put the codes back to userc=Control
 void input() {
+  static bool L1WasPressed = false;
+  static bool XWasPressed = false;
+  static bool DownWasPressed = false;
+  
   // Intake control - R1 forward, R2 reverse
   if(Controller1.ButtonR1.pressing()) {
     intakeMotor.setVelocity(100, percent);
@@ -1267,67 +1269,56 @@ void input() {
     intakeMotor.spin(forward);
     hoodMotor.spin(forward);
   } 
-  else if(Controller1.ButtonR2.pressing()) {  // Changed to 'else if'
-    intakeMotor.setVelocity(100, percent);
-    hoodMotor.setVelocity(100, percent);
-    if (slowMode) {
-      intakeMotor.setVelocity(50, percent);
-      hoodMotor.setVelocity(50, percent);
-    }
+  else if(Controller1.ButtonR2.pressing()) {
+    intakeMotor.setVelocity(slowMode ? 25 : 100, percent);
+    hoodMotor.setVelocity(slowMode ? 25 : 100, percent);
     intakeMotor.spin(reverse);
     hoodMotor.spin(reverse);
   }
-  else {  // Only stop if neither button is pressed
-    intakeMotor.stop();
-    hoodMotor.stop();
-  }
-  
-  // L2 for slow mode
-  if(Controller1.ButtonL2.pressing()) {
-    intakeMotor.setVelocity(50, percent);
-    hoodMotor.setVelocity(50, percent);
-    slowMode = true;
-  } else {
-    slowMode = false;
-  }
-  
-  // Scraper toggle with L1
-  if(Controller1.ButtonL1.pressing()) {
-    Scraper();
-  }
-  
-  // Descore toggle with X button
-  if(Controller1.ButtonX.pressing()) {
-    Descore();
-  }
-  
-  // Scoring buttons
-  if(Controller1.ButtonUp.pressing()) {
+  // ButtonUp for high goal scoring
+  else if(Controller1.ButtonUp.pressing()) {
     intakeMotor.setVelocity(100, percent);
     hoodMotor.setVelocity(100, percent);
     intakeMotor.spin(forward);
     hoodMotor.spin(forward);
   }
+  // ButtonLeft for middle goal scoring
   else if(Controller1.ButtonLeft.pressing()) {
-    intakeMotor.setVelocity(100, percent);
-    hoodMotor.setVelocity(100, percent);
-    if (slowMode) {
-      intakeMotor.setVelocity(50, percent);
-      hoodMotor.setVelocity(50, percent);
-    }
+    intakeMotor.setVelocity(slowMode ? 25 : 100, percent);
+    hoodMotor.setVelocity(slowMode ? 25 : 100, percent);
     intakeMotor.spin(forward);
-    hoodMotor.spin(reverse);
-    
-    if(hoodState) {
-      hoodStopper();
-    }
+    hoodMotor.spin(reverse);  // Hood goes opposite direction
   }
-  else if(!Controller1.ButtonR1.pressing() && !Controller1.ButtonR2.pressing()) {
-    // Only reset hood state if no other buttons controlling motors are pressed
-    if(hoodState) {
-      hood.set(true);
-      hoodState = false;
-    }
+  // Only stop if NO motor buttons are pressed
+  else {
+    intakeMotor.stop();
+    hoodMotor.stop();
+  }
+  
+  // L2 for slow mode
+  slowMode = Controller1.ButtonL2.pressing();
+  
+  // Scraper toggle with L1 (debounced)
+  if(Controller1.ButtonL1.pressing() && !L1WasPressed) {
+    Scraper();
+    L1WasPressed = true;
+  } else if (!Controller1.ButtonL1.pressing()) {
+    L1WasPressed = false;
+  }
+  
+  // Descore toggle with X button (debounced)
+  if(Controller1.ButtonX.pressing() && !XWasPressed) {
+    Descore();
+    XWasPressed = true;
+  } else if (!Controller1.ButtonX.pressing()) {
+    XWasPressed = false;
+  }
+
+  if(Controller1.ButtonDown.pressing() && !DownWasPressed) {
+    hoodStopper();
+    DownWasPressed = true;
+  } else if (!Controller1.ButtonDown.pressing()) {
+    DownWasPressed = false;
   }
 }
 
@@ -1600,7 +1591,7 @@ void preAutonomous(void) {
   
   vex::task trackTouch_Thread(trackTouch);
   //Calls auton selector
-  firstPage();
+  //firstPage();
 }
 
 void autonomous(void) {
@@ -1631,76 +1622,79 @@ void autonomous(void) {
   
   Controller1.ButtonX.pressed(Negus);
   scraperState = false;
-  scraper_descore.set(false);
+  hood.set(false);
   inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
 
+  Drivetrain.driveFor(forward, 5, inches);
+
   // vex::task odometryTest_Thread(odometryTest);
-  vex::task odometry_Thread(odometry);
-  vex::task getMotion_Thread(getMotion); // Start motion tracking
-  vex::task motionProfile_Thread(motionProfile); // Start motion profile
+  // vex::task odometry_Thread(odometry);
+  // vex::task getMotion_Thread(getMotion); // Start motion tracking
+  // vex::task motionProfile_Thread(motionProfile); // Start motion profile
   //vex::task graph_Thread(graphTask);
   
   // place automonous code here
-  switch (preAutonSelector) {
-    case 'A': // Blue Drive Forward
-      blueDriveForwardPath();
-      isAutonomous = false;
-      break;
-    case 'B': // Blue East 1 Goal
-      blueEast1GoalPath();
-      isAutonomous = false;
-      break;
-    case 'C': // Blue East 2 Goal
-      blueEast2GoalPath();
-      isAutonomous = false;
-      break;
-    case 'D': // Blue West 1 Goal
-      blueWest1GoalPath();
-      isAutonomous = false;
-      break;
-    case 'E': // Blue West 2 Goal
-      blueWest2GoalPath();
-      isAutonomous = false;
-      break;
-    case 'F': // Red Drive Forward
-      redDriveForwardPath();
-      isAutonomous = false;
-      break;
-    case 'G': // Red East 1 Goal
-      redEast1GoalPath();
-      isAutonomous = false;
-      break;
-    case 'H': // Red East 2 Goal
-      redEast2GoalPath();
-      isAutonomous = false;
-      break;
-    case 'I': // Red West 1 Goal
-      redWest1GoalPath();
-      isAutonomous = false;
-      break;
-    case 'J': // Red West 2 Goal
-      redWest2GoalPath();
-      isAutonomous = false;
-      break;
-    case 'K': // Auton Skills
-      autoSkillsPath();
-      isAutonomous = false;
-      break;
-    case 'L': // Driver Skills
-      break;
-    default: // The default case handles invalid operators
-      break;
-  }
+  //Drivetrain.driveFor(forward, 10, inches);
+  // Drivetrain.driveFor(reverse, 45, inches);
+  // switch (preAutonSelector) {
+  //   case 'A': // Blue Drive Forward
+  //     blueDriveForwardPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'B': // Blue East 1 Goal
+  //     blueEast1GoalPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'C': // Blue East 2 Goal
+  //     blueEast2GoalPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'D': // Blue West 1 Goal
+  //     blueWest1GoalPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'E': // Blue West 2 Goal
+  //     blueWest2GoalPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'F': // Red Drive Forward
+  //     redDriveForwardPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'G': // Red East 1 Goal
+  //     redEast1GoalPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'H': // Red East 2 Goal
+  //     redEast2GoalPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'I': // Red West 1 Goal
+  //     redWest1GoalPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'J': // Red West 2 Goal
+  //     redWest2GoalPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'K': // Auton Skills
+  //     autoSkillsPath();
+  //     isAutonomous = false;
+  //     break;
+  //   case 'L': // Driver Skills
+  //     break;
+  //   default: // The default case handles invalid operators
+  //     break;
+  // }
   
 }
 
 void userControl(void) {
   vex::task odometry_Thread(odometry);
-  if (inertialSensor.isCalibrating() == false) {
-      inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
-      inertialSensor.resetRotation();
-  }
-  hoodStopper();  
+  // if (inertialSensor.isCalibrating() == false) {
+  //     inertialSensor.setHeading(90, degrees); //sets the heading to 90 degrees to match field orientation
+  //     inertialSensor.resetRotation();
+  // }
   enableDrivePID = false; //disables PID control during user control
   Drivetrain.setDriveVelocity(100, percent);
   Drivetrain.setTurnVelocity(100, percent);
