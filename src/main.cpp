@@ -73,7 +73,7 @@ distance distanceFront = distance(PORT15);
 distance distanceLeft = distance(PORT16);
 distance distanceRight = distance(PORT17);
 
-distance doubleParkMacro = distance(PORT20);
+distance distanceBack = distance(PORT20);
 
 
 //sets max rpm of motors
@@ -292,6 +292,43 @@ matrix C = A.multiply(B); // Resulting matrix C will be 2x2
 4. Get values from new matrix C
 double val = C.at(0, 0); // Access element at row 0, column 0
 */
+//Start Monte Carlo predicted values functions. Covariance, mean, multivariance generation
+// class Sample {
+//   public: 
+//     int numSamples;
+//     int auto
+    
+// }
+//Start variables for Monte Carlo Localization
+const int numberOfSamples = 200;
+double mean = 0.0;
+double std = 1.0;
+double time = 0.0; //For timestep
+struct Sample {
+  double x;
+  double y;
+} samples[numberOfSamples];
+//Step 1: Prediction Phase
+/*  In this step the filter iterates through each particle and predicts how the robot could have moved, 
+given the control input or sensor readings, such as drivetrain encoders. */
+//Make an array of predicted values with a standard distribution. Only x, y prediction.
+// double predictedSamples[numberOfSamples][2]; //200 samples for x and y
+
+// void update() {
+
+// }
+
+// void generateSamples() {
+//   for(int i = 0, i < numberOfSamples; i++) {
+
+//   }
+// }
+
+//Step 2: Update Phase
+/*In this step the filter weighs each particle using the probability that you would get this sensor 
+measurement given that the robot is at that position, then there is a resampling step to move 
+particles to places with higher weights */
+
 //////////////////////////////////////////////
 //Autonomous Functions
 //////////////////////////////////////////////
@@ -474,7 +511,7 @@ int distanceReset() {
     // Returns true if there isn't a wall. Work based on this.
     forwardWall = distanceFront.isObjectDetected();
     rightWall = distanceFront.isObjectDetected();
-    backWall = doubleParkMacro.isObjectDetected();
+    backWall = distanceBack.isObjectDetected();
     leftWall = distanceLeft.isObjectDetected();
 
     
@@ -483,7 +520,7 @@ int distanceReset() {
 }
 
 int doublePark() {
-  while(doubleParkMacro.objectDistance(inches) < 5) {
+  while(distanceBack.objectDistance(inches) < 5) {
 
   }
   return 0;
