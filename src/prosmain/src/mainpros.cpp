@@ -214,6 +214,7 @@ void input() {
     static bool XWasPressed = false;
     static bool DownWasPressed = false;
     static bool YWasPressed = false;
+    static bool L2WasPressed = false;
     
     // Intake control - R1 forward, R2 reverse
     if(Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
@@ -223,19 +224,13 @@ void input() {
     } 
     else if(Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
         int velocity = slowMode ? 40 : 127;
-        intakeMotor.move(-velocity);
+        intakeMotor.move(velocity);
         hoodMotor.move(-velocity);
     }
     // ButtonUp for high goal scoring
     else if(Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_UP)) {
-        intakeMotor.move(127);
-        hoodMotor.move(127);
-    }
-    // ButtonLeft for middle goal scoring
-    else if(Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_LEFT)) {
-        int velocity = slowMode ? 40 : 127;
-        intakeMotor.move(velocity);
-        hoodMotor.move(-velocity);  // Hood goes opposite direction
+        intakeMotor.move(-127);
+        hoodMotor.move(-127);
     }
     // Only stop if NO motor buttons are pressed
     else {
@@ -244,7 +239,7 @@ void input() {
     }
     
     // L2 for slow mode
-    slowMode = Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
+    slowMode = Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_LEFT);
     
     // Scraper toggle with L1 (debounced)
     if(Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_L1) && !L1WasPressed) {
@@ -262,11 +257,11 @@ void input() {
         XWasPressed = false;
     }
 
-    if(Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN) && !DownWasPressed) {
+    if(Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_L2) && !L2WasPressed) {
         hoodStopper();
-        DownWasPressed = true;
-    } else if (!Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)) {
-        DownWasPressed = false;
+        L2WasPressed = true;
+    } else if (!Controller1.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
+        L2WasPressed = false;
     }
 
     // Odom Lift Toggle with Y button
@@ -516,11 +511,11 @@ void odometry(void* param) {
 void odometryTest(void* param) {
     while (true) {
         pros::lcd::clear();
-        pros::lcd::set_text(1, "x: " + std::to_string(robotPosition.at(0,0)));
-        pros::lcd::set_text(2, "y: " + std::to_string(robotPosition.at(1,0)));
-        pros::lcd::set_text(3, "Heading: " + std::to_string(robotPosition.at(2,0)));
-        pros::lcd::set_text(4, std::to_string(rotationalLateral.get_position() / 100.0));
-        pros::lcd::set_text(5, std::to_string(rotationalHorizontal.get_position() / 100.0));
+        pros::lcd::print(1, "x:  %f", robotPosition.at(0,0));
+        pros::lcd::print(2, "y:  %f", robotPosition.at(1,0));
+        pros::lcd::print(3, "Heading:  %f", robotPosition.at(2,0));
+        pros::lcd::print(4, "Lateral:  %f", (rotationalLateral.get_position() / 100.0));
+        pros::lcd::print(5, "Horizontal:  %f", (rotationalHorizontal.get_position() / 100.0));
         pros::delay(100);
     }
 }
@@ -1700,28 +1695,19 @@ void opcontrol() {
     robotPosition.at(1,0) = 0; //y position in inches
     robotPosition.at(2,0) = 90; //heading in degrees
 
-    pros::Task odometry_Thread(odometry, nullptr, TASK_PRIORITY_DEFAULT, 16384, "Odometry");    //pros::Task odometryTest_Thread(odometryTest);
+    pros::Task odometryThread(odometry);
+    pros::Task odometryTestThread(odometryTest);
     // enableDrivePID = false; //disables PID control during user control
     pros::lcd::set_text(1, "driver control");
         
-    LeftDriveSmart.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-    RightDriveSmart.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    LeftDriveSmart.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+    RightDriveSmart.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
     intakeMotor.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
     hoodMotor.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
         
     // place driver control in this while loop
 
     while(true){
-        // Display position info periodically
-        // static int displayCounter = 0;
-        // if (displayCounter % 400 == 0) { // Every ~4 seconds (400 * 10ms)
-        //   pros::lcd::clear();
-        //   pros::lcd::set_text(1, "x: " + std::to_string(robotPosition.at(0,0)));
-        //   pros::lcd::set_text(2, "y: " + std::to_string(robotPosition.at(1,0)));
-        //   pros::lcd::set_text(3, "Heading: " + std::to_string(robotPosition.at(2,0)));
-        // }
-        // displayCounter++;
-        
         // Arcade drive with cubic curve
         double joyLeft = Controller1.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         double joyRight = Controller1.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
