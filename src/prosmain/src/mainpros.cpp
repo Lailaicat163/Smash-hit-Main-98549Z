@@ -35,9 +35,9 @@
 // Motor and Sensor Declarations
 //////////////////////////////////////////////
 pros::MotorGroup LeftDriveSmart({-14, -13, -18});
-pros::MotorGroup RightDriveSmart({15, 19, 20}); //good
+pros::MotorGroup RightDriveSmart({15, 19, 20});
 pros::MotorGroup intakeMotor({2, -17}); 
-pros::Motor hoodMotor(-11);//good
+pros::Motor hoodMotor(11);
 
 // Controller
 pros::Controller Controller1(pros::E_CONTROLLER_MASTER);
