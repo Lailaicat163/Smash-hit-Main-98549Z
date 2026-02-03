@@ -1,4 +1,5 @@
 #include "main.h"
+#include "pros/apix.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -8,52 +9,53 @@
 // Define Settings
 //////////////////////////////////////////////
 #define PI 3.1415926535897
-#define WHEEL_CIRCUMFERENCE 3.25 * PI  //inches
-#define DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL 7.0 / 16.0  //inches
-#define DISTANCE_FROM_CENTER_TO_HORIZONTAL_WHEEL 3.0  //inches
+#define WHEEL_CIRCUMFERENCE (3.25 * PI)  //inches
+#define TRACKING_WHEEL_CIRCUMFERENCE (2.0 * PI)  //inches
+#define DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL 0.5  //inches
+#define DISTANCE_FROM_CENTER_TO_HORIZONTAL_WHEEL 4.0  //inches
 #define TRACK_WIDTH 10.75  //inches
 #define BUFFER 50 //Last 50 values
 #define MM_TO_INCHES 25.4 //Divide by 25.4 to convert mm to inches
 
-#define DIST_LEFT_X 3.0 //X position of left distance sensor relative to robot center (inches)
-#define DIST_LEFT_Y 3.0 //Y position of left distance sensor relative to robot center (inches)
+#define DIST_LEFT_X 3.0 //X position of left distance sensor relative to robot center (inches) NOT IN USE
+#define DIST_LEFT_Y 3.0 //Y position of left distance sensor relative to robot center (inches) NOT IN USE
 
-#define DIST_RIGHT_X 3.0 //X position of right distance sensor relative to robot center (inches)
-#define DIST_RIGHT_Y 3.0 //Y position of right distance sensor relative to robot center (inches)
+#define DIST_RIGHT_X 4.5 //X position of right distance sensor relative to robot center (inches)
+#define DIST_RIGHT_Y 0.5 //Y position of right distance sensor relative to robot center (inches)
 
-#define DIST_FRONT_X 3.0 //X position of front distance sensor relative to robot center (inches)
-#define DIST_FRONT_Y 3.0 //Y position of front distance sensor relative to robot center (inches)
+#define DIST_FRONT_X 6.5 //X position of front distance sensor relative to robot center (inches)
+#define DIST_FRONT_Y 1.5 //Y position of front distance sensor relative to robot center (inches)
 
-#define DIST_BACK_X 3.0 //X position of back distance sensor relative to robot center (inches)
-#define DIST_BACK_Y 3.0 //Y position of back distance sensor relative to robot center (inches)
+#define DIST_BACK_X 3.0 //X position of back distance sensor relative to robot center (inches) NOT IN USE
+#define DIST_BACK_Y 3.0 //Y position of back distance sensor relative to robot center (inches) NOT IN USE
 
 
 
 //////////////////////////////////////////////
 // Motor and Sensor Declarations
 //////////////////////////////////////////////
-pros::MotorGroup LeftDriveSmart({-12, -14, -13});
-pros::MotorGroup RightDriveSmart({15, 19, 18});
-pros::MotorGroup intakeMotor({2, -17});
-pros::Motor hoodMotor(-11);
+pros::MotorGroup LeftDriveSmart({-14, -13, -18});
+pros::MotorGroup RightDriveSmart({15, 19, 20}); //good
+pros::MotorGroup intakeMotor({2, -17}); 
+pros::Motor hoodMotor(-11);//good
 
 // Controller
 pros::Controller Controller1(pros::E_CONTROLLER_MASTER);
 
 // Pneumatics
 //Digital in is scraper
-pros::adi::DigitalOut descore('H');
+pros::adi::DigitalOut descore('E');
 //Digital in is descore and digital out is hood
-pros::adi::DigitalOut hood('A');
-pros::adi::DigitalOut scraper('F');
-pros::adi::DigitalOut odomLift('E');
+pros::adi::DigitalOut hood('F');
+pros::adi::DigitalOut scraper('H');
+pros::adi::DigitalOut odomLift('G');
 
 //Initializes the rotational sensors. Set true to inverse the rotation and velocity to negative values.
-pros::Rotation rotationalLateral(20);
-pros::Rotation rotationalHorizontal(4);
+pros::Rotation rotationalLateral(10);
+pros::Rotation rotationalHorizontal(12);
 
 //Initializes the inertial sensor. starts from 0 degrees and increases by turning clockwise.
-pros::IMU inertialSensor(5);
+pros::IMU inertialSensor(4);
 
 //Initializes the color sensor.
 pros::Optical opticalSensor(21);
@@ -61,10 +63,10 @@ pros::Optical opticalSensor(21);
 //Blue hue is from 210 to 240
 
 //Initializes the distance sensors (4)
-pros::Distance distanceFront(15);
-pros::Distance distanceLeft(16);
-pros::Distance distanceRight(17);
-pros::Distance distanceBack(20);
+pros::Distance distanceFront(9);
+pros::Distance distanceLeft(3);
+pros::Distance distanceRight(6);
+pros::Distance distanceBack(5);
 
 //sets max rpm of motors
 float maxMotorPercentage = 100.0;
@@ -76,6 +78,26 @@ double gearRatio = 3.0 / 5.0; // input gear teeth / output gear teeth
 //Set motion variables
 double maxAcceleration = 15;
 double maxJerk = 15;
+
+//////
+//Brain screen with lvgl and auton selector
+//////////
+// class BrainScreen {
+//     private:
+//         lv_obj_t* frame;
+//         lv_obj_t* autonIndicator;
+//     struct autonOption {
+//         char preAutonSelector;
+//         std::string autonName;
+//         bool isRedAlliance;
+//         bool isSkills;
+//         std::string numberOfGoals;
+
+//     };
+
+
+// };BrainScreen Brain;
+
 
 //////////////////////
 //Input
@@ -317,6 +339,7 @@ public:
         return result;
     }
 };
+
 /* How to use matrix class:
 1. Define matrix size
 matrix A(2, 3); // 2 rows, 3 columns
@@ -342,14 +365,14 @@ double val = C.at(0, 0); // Access element at row 0, column 0
     
 // }
 //Start variables for Monte Carlo Localization
-const int numberOfSamples = 200;
-double mean = 0.0;
-double std = 1.0;
-double time = 0.0; //For timestep
-struct Sample {
-    double x;
-    double y;
-} samples[numberOfSamples];
+// const int numberOfSamples = 200;
+// double mean = 0.0;
+// double std = 1.0;
+// double time = 0.0; //For timestep
+// struct Sample {
+//     double x;
+//     double y;
+// } samples[numberOfSamples];
 //Step 1: Prediction Phase
 /*  In this step the filter iterates through each particle and predicts how the robot could have moved, 
 given the control input or sensor readings, such as drivetrain encoders. */
@@ -429,11 +452,19 @@ double previousHorizontalTravelled = 0;
 
 //Odometry
 void odometry(void* param) {
+    // Wait for sensors to settle, then seed previous values from current readings.
+    // Without this, the first loop iteration computes a massive false delta
+    // from 0 to whatever the sensor already reads.
+    pros::delay(100);
+    previousAngleRotation = inertialSensor.get_rotation();
+    previousHeading = inertialSensor.get_heading();
+    previousLateralTravelled = rotationalLateral.get_position() / 100.0;
+    previousHorizontalTravelled = rotationalHorizontal.get_position() / 100.0;
     while(true) {
         //code for odometry here
         //Calculating delta values
-        double deltaLateral = (rotationalLateral.get_position() / 100.0 - previousLateralTravelled) * radianConversion; //inches
-        double deltaHorizontal = (rotationalHorizontal.get_position() / 100.0 - previousHorizontalTravelled) * radianConversion; //inches
+        double deltaLateral = (rotationalLateral.get_position() / 100.0 - previousLateralTravelled) * (TRACKING_WHEEL_CIRCUMFERENCE / 360.0);
+        double deltaHorizontal = (rotationalHorizontal.get_position() / 100.0 - previousHorizontalTravelled) * (TRACKING_WHEEL_CIRCUMFERENCE / 360.0);
         //gets change in orientation as an absolute value. This is for the arc angle
         double deltaOrientation = inertialSensor.get_rotation() - previousAngleRotation; //in degrees
         double arcAngle = fabs(deltaOrientation); //in degrees
@@ -449,7 +480,7 @@ void odometry(void* param) {
         }
         //gets the radius of the tracking centers arc
         //radius = distance travelled of lateral tracking wheel / arc angle * (PI/180) (to convert to radians)
-        double lateralArcRadius;
+           double lateralArcRadius = 0;
 
         //Gets the local chord length
         double localDeltaX, localDeltaY;
@@ -459,7 +490,7 @@ void odometry(void* param) {
         } else {
             if (deltaOrientation < 0) {
                 lateralArcRadius = deltaLateral / arcAngleRadians - DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL;
-            } else if (deltaOrientation > 0) {
+            } else {
                 lateralArcRadius = deltaLateral / arcAngleRadians + DISTANCE_FROM_CENTER_TO_LATERAL_WHEEL;
             }
             double horizontalArcRadius = deltaHorizontal / arcAngleRadians + DISTANCE_FROM_CENTER_TO_HORIZONTAL_WHEEL;
@@ -512,6 +543,7 @@ int getLeftDistance() {
     if (leftWall == true) {
         return distanceLeft.get() / MM_TO_INCHES* leftDistanceCoefficient;
     }
+    return -1;
 }
 
 double frontDistanceCoefficient = 1.0;
@@ -525,6 +557,7 @@ int getFrontDistance() {
     if (frontWall == true) {
         return distanceFront.get() / MM_TO_INCHES * frontDistanceCoefficient;
     }
+    return -1;
 }
 
 double rightDistanceCoefficient = 1.0;
@@ -538,6 +571,7 @@ int getRightDistance() {
     if (rightWall == true) {
         return distanceRight.get() / MM_TO_INCHES * rightDistanceCoefficient;
     }
+    return -1;
 }
 
 double backDistanceCoefficient = 1.0;
@@ -551,6 +585,7 @@ int getBackDistance() {
     if (backWall == true) {
         return distanceBack.get() / MM_TO_INCHES * backDistanceCoefficient;
     }
+    return -1;
 }
 
 int distanceTest() {
@@ -570,199 +605,106 @@ int distanceTest() {
 
 // Field Starts at 0,0 to 144, 144
 
-void distanceReset() {
-    
-}
-
-/*
-// For resetting with left wall
-// Heading 0
-// Resets only x coordinate
-int distanceResetLeft() {
-    double leftDistance = getLeftDistance();
+void distanceReset(char sensorPosition, char wallPosition) {//A top, B right, C bottom, D left
     double frontDistance = getFrontDistance();
     double rightDistance = getRightDistance();
     double backDistance = getBackDistance();
-
-    double x;
-    double hyp;
-    double theta;
-    double robotX;
-    
-    if (leftDistance != -1) {
-        x = DIST_LEFT_X + leftDistance;
-        hyp = sqrt(x * x + DIST_LEFT_Y * DIST_LEFT_Y);
-        theta = fabs(0 - robotPosition.at(2,0));
-        robotX = hyp * cos(theta * radianConversion);
-        robotPosition.at(0,0) = robotX;
-        return 0;
-    } else if (frontDistance != -1) {
-        x = DIST_FRONT_Y + frontDistance;
-        hyp = sqrt(x * x + DIST_FRONT_X * DIST_FRONT_X);
-        theta = fabs(0 - robotPosition.at(2,0));
-        robotX = hyp * cos(theta * radianConversion);
-        robotPosition.at(0,0) = robotX;
-        return 0;
-    } else if (rightDistance != -1) {
-        x = DIST_RIGHT_X + rightDistance;
-        hyp = sqrt(x * x + DIST_RIGHT_Y * DIST_RIGHT_Y);
-        theta = fabs(0 - robotPosition.at(2,0));
-        robotX = hyp * cos(theta * radianConversion);
-        robotPosition.at(0,0) = robotX;
-        return 0;
-    } else if (backDistance != -1) {
-        x = DIST_BACK_Y + backDistance;
-        hyp = sqrt(x * x + DIST_BACK_X * DIST_BACK_X);
-        theta = fabs(0 - robotPosition.at(2,0));
-        robotX = hyp * cos(theta * radianConversion);
-        robotPosition.at(0,0) = robotX;
-        return 0;
-    }
-    
-    return -1; // No distance readings available
-}
-
-// For resetting with right wall
-// Heading 180
-// Resets only x coordinate
-int distanceResetRight() {
     double leftDistance = getLeftDistance();
-    double frontDistance = getFrontDistance();
-    double rightDistance = getRightDistance();
-    double backDistance = getBackDistance();
 
-    double x;
-    double hyp;
-    double theta;
-    double robotX;
-    
-    if (leftDistance != -1) {
-        x = DIST_LEFT_X + leftDistance;
-        hyp = sqrt(x * x + DIST_LEFT_Y * DIST_LEFT_Y);
-        theta = fabs(180 - robotPosition.at(2,0));
-        robotX = hyp * cos(theta * radianConversion);
-        robotPosition.at(0,0) = 144 - robotX;
-        return 0;
-    } else if (frontDistance != -1) {
-        x = DIST_FRONT_Y + frontDistance;
-        hyp = sqrt(x * x + DIST_FRONT_X * DIST_FRONT_X);
-        theta = fabs(180 - robotPosition.at(2,0));
-        robotX = hyp * cos(theta * radianConversion);
-        robotPosition.at(0,0) = 144 - robotX;
-        return 0;
-    } else if (rightDistance != -1) {
-        x = DIST_RIGHT_X + rightDistance;
-        hyp = sqrt(x * x + DIST_RIGHT_Y * DIST_RIGHT_Y);
-        theta = fabs(180 - robotPosition.at(2,0));
-        robotX = hyp * cos(theta * radianConversion);
-        robotPosition.at(0,0) = 144 - robotX;
-        return 0;
-    } else if (backDistance != -1) {
-        x = DIST_BACK_Y + backDistance;
-        hyp = sqrt(x * x + DIST_BACK_X * DIST_BACK_X);
-        theta = fabs(180 - robotPosition.at(2,0));
-        robotX = hyp * cos(theta * radianConversion);
-        robotPosition.at(0,0) = 144 - robotX;
-        return 0;
+    double heading = robotPosition.at(2,0) * radianConversion;
+
+    switch(sensorPosition) {
+        case 'A': // Front Sensor
+            if (frontDistance != -1) {
+                double sensorX = DIST_FRONT_X * cos(heading) - DIST_FRONT_Y * sin(heading);
+                double sensorY = DIST_FRONT_X * sin(heading) + DIST_FRONT_Y * cos(heading);
+                double totalDist = frontDistance;
+            
+                switch(wallPosition) {
+                    case 'A': // Front Wall
+                        robotPosition.at(1,0) = 144 - totalDist - sensorY;
+                        break;
+                    case 'B': // Right Wall
+                        robotPosition.at(0,0) = 144 - totalDist - sensorX;
+                        break;
+                    case 'C': // Back Wall
+                        robotPosition.at(1,0) = totalDist + sensorY;
+                        break;
+                    case 'D': // Left Wall
+                        robotPosition.at(0,0) = totalDist + sensorX;
+                        break;
+                }
+            }
+            break;
+        case 'B': // Right Sensor
+            if (rightDistance != -1) {
+                double sensorX = DIST_RIGHT_X * cos(heading) - DIST_RIGHT_Y * sin(heading);
+                double sensorY = DIST_RIGHT_X * sin(heading) + DIST_RIGHT_Y * cos(heading);
+                double totalDist = rightDistance;
+            
+                switch(wallPosition) {
+                    case 'A': // Front Wall
+                        robotPosition.at(1,0) = 144 - totalDist - sensorY;
+                        break;
+                    case 'B': // Right Wall
+                        robotPosition.at(0,0) = 144 - totalDist - sensorX;
+                        break;
+                    case 'C': // Back Wall
+                        robotPosition.at(1,0) = totalDist + sensorY;
+                        break;
+                    case 'D': // Left Wall
+                        robotPosition.at(0,0) = totalDist + sensorX;
+                        break;
+                }
+            }
+            break;
+        case 'C': // Back Sensor
+            if (backDistance != -1) {
+                double sensorX = DIST_BACK_X * cos(heading) - DIST_BACK_Y * sin(heading);
+                double sensorY = DIST_BACK_X * sin(heading) + DIST_BACK_Y * cos(heading);
+                double totalDist = backDistance;
+            
+                switch(wallPosition) {
+                    case 'A': // Front Wall
+                        robotPosition.at(1,0) = 144 - totalDist - sensorY;
+                        break;
+                    case 'B': // Right Wall
+                        robotPosition.at(0,0) = 144 - totalDist - sensorX;
+                        break;
+                    case 'C': // Back Wall
+                        robotPosition.at(1,0) = totalDist + sensorY;
+                        break;
+                    case 'D': // Left Wall
+                        robotPosition.at(0,0) = totalDist + sensorX;
+                        break;
+                }
+            }
+            break;
+        case 'D': // Left Sensor
+            if (leftDistance != -1) {
+                double sensorX = DIST_LEFT_X * cos(heading) - DIST_LEFT_Y * sin(heading);
+                double sensorY = DIST_LEFT_X * sin(heading) + DIST_LEFT_Y * cos(heading);
+                double totalDist = leftDistance;
+            
+                switch(wallPosition) {
+                    case 'A': // Front Wall
+                        robotPosition.at(1,0) = 144 - totalDist - sensorY;
+                        break;
+                    case 'B': // Right Wall
+                        robotPosition.at(0,0) = 144 - totalDist - sensorX;
+                        break;
+                    case 'C': // Back Wall
+                        robotPosition.at(1,0) = totalDist + sensorY;
+                        break;
+                    case 'D': // Left Wall
+                        robotPosition.at(0,0) = totalDist + sensorX;
+                        break;
+                }
+            }
+            break;
     }
-    
-    return -1; // No distance readings available
 }
 
-// For resetting with front wall
-// Heading 90
-// Resets only y coordinate
-int distanceResetFront() {
-    double leftDistance = getLeftDistance();
-    double frontDistance = getFrontDistance();
-    double rightDistance = getRightDistance();
-    double backDistance = getBackDistance();
-
-    double x;
-    double hyp;
-    double theta;
-    double robotY;
-    
-    if (leftDistance != -1) {
-        x = DIST_LEFT_X + leftDistance;
-        hyp = sqrt(x * x + DIST_LEFT_Y * DIST_LEFT_Y);
-        theta = fabs(90 - robotPosition.at(2,0));
-        robotY = hyp * cos(theta * radianConversion);
-        robotPosition.at(1,0) = robotY;
-        return 0;
-    } else if (frontDistance != -1) {
-        x = DIST_FRONT_Y + frontDistance;
-        hyp = sqrt(x * x + DIST_FRONT_X * DIST_FRONT_X);
-        theta = fabs(90 - robotPosition.at(2,0));
-        robotY = hyp * cos(theta * radianConversion);
-        robotPosition.at(1,0) = robotY;
-        return 0;
-    } else if (rightDistance != -1) {
-        x = DIST_RIGHT_X + rightDistance;
-        hyp = sqrt(x * x + DIST_RIGHT_Y * DIST_RIGHT_Y);
-        theta = fabs(90 - robotPosition.at(2,0));
-        robotY = hyp * cos(theta * radianConversion);
-        robotPosition.at(1,0) = robotY;
-        return 0;
-    } else if (backDistance != -1) {
-        x = DIST_BACK_Y + backDistance;
-        hyp = sqrt(x * x + DIST_BACK_X * DIST_BACK_X);
-        theta = fabs(90 - robotPosition.at(2,0));
-        robotY = hyp * cos(theta * radianConversion);
-        robotPosition.at(1,0) = robotY;
-        return 0;
-    }
-    
-    return -1; // No distance readings available
-}
-
-// For resetting with back wall
-// Heading 270
-// Resets only y coordinate
-int distanceResetBack() {
-    double leftDistance = getLeftDistance();
-    double frontDistance = getFrontDistance();
-    double rightDistance = getRightDistance();
-    double backDistance = getBackDistance();
-
-    double x;
-    double hyp;
-    double theta;
-    double robotY;
-    
-    if (leftDistance != -1) {
-        x = DIST_LEFT_X + leftDistance;
-        hyp = sqrt(x * x + DIST_LEFT_Y * DIST_LEFT_Y);
-        theta = fabs(270 - robotPosition.at(2,0));
-        robotY = hyp * cos(theta * radianConversion);
-        robotPosition.at(1,0) = 144 - robotY;
-        return 0;
-    } else if (frontDistance != -1) {
-        x = DIST_FRONT_Y + frontDistance;
-        hyp = sqrt(x * x + DIST_FRONT_X * DIST_FRONT_X);
-        theta = fabs(270 - robotPosition.at(2,0));
-        robotY = hyp * cos(theta * radianConversion);
-        robotPosition.at(1,0) = 144 - robotY;
-        return 0;
-    } else if (rightDistance != -1) {
-        x = DIST_RIGHT_X + rightDistance;
-        hyp = sqrt(x * x + DIST_RIGHT_Y * DIST_RIGHT_Y);
-        theta = fabs(270 - robotPosition.at(2,0));
-        robotY = hyp * cos(theta * radianConversion);
-        robotPosition.at(1,0) = 144 - robotY;
-        return 0;
-    } else if (backDistance != -1) {
-        x = DIST_BACK_Y + backDistance;
-        hyp = sqrt(x * x + DIST_BACK_X * DIST_BACK_X);
-        theta = fabs(270 - robotPosition.at(2,0));
-        robotY = hyp * cos(theta * radianConversion);
-        robotPosition.at(1,0) = 144 - robotY;
-        return 0;
-    }
-    
-    return -1; // No distance readings available
-}
-    */
 
 
 //Double Park Function (IN PROGRESS)
@@ -898,7 +840,7 @@ double rightRobotAcceleration[BUFFER] = {};
 void getMotion(void* param) {
     while(true) {
         bufferIndex = motionCounter % BUFFER;
-        int prevBufferIndex = (bufferIndex - 1 + BUFFER) % BUFFER;
+        int prevBufferIdx = (bufferIndex - 1 + BUFFER) % BUFFER;
         double dt = 0.02; //Change in time 20 milliseconds
 
         //velocity
@@ -910,8 +852,8 @@ void getMotion(void* param) {
 
         //acceleration delta v over delta t
         if(motionCounter > 0) {
-            double leftAcceleration = (leftRobotVelocity[bufferIndex] - leftRobotVelocity[prevBufferIndex]) / dt;
-            double rightAcceleration = (rightRobotVelocity[bufferIndex] - rightRobotVelocity[prevBufferIndex]) / dt;
+            double leftAcceleration = (leftRobotVelocity[bufferIndex] - leftRobotVelocity[prevBufferIdx]) / dt;
+            double rightAcceleration = (rightRobotVelocity[bufferIndex] - rightRobotVelocity[prevBufferIdx]) / dt;
 
             leftRobotAcceleration[bufferIndex] = leftAcceleration;
             rightRobotAcceleration[bufferIndex] = rightAcceleration;
@@ -926,30 +868,34 @@ void getMotion(void* param) {
 
 // Get most recent velocity
 double getCurrentLeftVelocity() {
-    int index = (motionCounter - 1) % BUFFER;
-    if (index < 0) index += BUFFER;
-    return leftRobotVelocity[index];
+    if (motionCounter == 0) return 0.0;
+    int idx = (motionCounter - 1) % BUFFER;
+    if (idx < 0) idx += BUFFER;
+    return leftRobotVelocity[idx];
 }
 
 // Get most recent acceleration
 double getCurrentLeftAcceleration() {
-    int index = (motionCounter - 1) % BUFFER;
-    if (index < 0) index += BUFFER;
-    return leftRobotAcceleration[index];
+    if (motionCounter == 0) return 0.0;
+    int idx = (motionCounter - 1) % BUFFER;
+    if (idx < 0) idx += BUFFER;
+    return leftRobotAcceleration[idx];
 }
 
 // Get most recent velocity
 double getCurrentRightVelocity() {
-    int index = (motionCounter - 1) % BUFFER;
-    if (index < 0) index += BUFFER;
-    return rightRobotVelocity[index];
+    if (motionCounter == 0) return 0.0;
+    int idx = (motionCounter - 1) % BUFFER;
+    if (idx < 0) idx += BUFFER;
+    return rightRobotVelocity[idx];
 }
 
 // Get most recent acceleration
 double getCurrentRightAcceleration() {
-    int index = (motionCounter - 1) % BUFFER;
-    if (index < 0) index += BUFFER;
-    return rightRobotAcceleration[index];
+    if (motionCounter == 0) return 0.0;
+    int idx = (motionCounter - 1) % BUFFER;
+    if (idx < 0) idx += BUFFER;
+    return rightRobotAcceleration[idx];
 }
 
 //inches/second
@@ -1230,9 +1176,9 @@ void goTo(double x, double y, double heading, double linearVelocity, double turn
 
 void setStartPosition(double x, double y, double heading) {
     robotPosition.at(0,0) = x;
-    robotPosition.at(0,1) = y;
-    robotPosition.at(0,2) = heading;
-    goTo(robotPosition.at(0,0), robotPosition.at(0,1), robotPosition.at(0,2), 0, 0, true);
+    robotPosition.at(1,0) = y;
+    robotPosition.at(2,0) = heading;
+    goTo(robotPosition.at(0,0), robotPosition.at(1,0), robotPosition.at(2,0), 0, 0, true);
 }
 
 //Red
@@ -1309,25 +1255,25 @@ void autoSkillsPath() {
 //PID Controller for tuning velocities given by the Ramsete controller
 
 //Desired right and left velocities given by controller
-
+/*
 //PID settings start
-const double velocity_kP = 0.0;
-const double velocity_kI = 0.0;
-const double velocity_kD = 0.0;
+const float velocity_kP = 0.0;
+const float velocity_kI = 0.0;
+const float velocity_kD = 0.0;
 
 //Error variables for velocity PID
 //left side
-double leftVelocity;
-double leftVelocityError;
-double leftPrevVelocityError = 0.0;
-double leftDerivativeVelocityError;
-double leftIntegralVelocityError = 0.0;
+float leftVelocity;
+float leftVelocityError;
+float leftPrevVelocityError = 0.0;
+float leftDerivativeVelocityError;
+float leftIntegralVelocityError = 0.0;
 //right side
-double rightVelocity;
-double rightVelocityError;
-double rightPrevVelocityError = 0.0;
-double rightDerivativeVelocityError;
-double rightIntegralVelocityError = 0.0;
+float rightVelocity;
+float rightVelocityError;
+float rightPrevVelocityError = 0.0;
+float rightDerivativeVelocityError;
+float rightIntegralVelocityError = 0.0;
 
 //Velocity PID function
 void velocityPID(void* param) {
@@ -1363,14 +1309,14 @@ void velocityPID(void* param) {
 
 //Start Driving Forward PID Controller
 //For going straight
-const double kP = 6;  //7
-const double kI = 0;
-const double kD = 0.01; //2 0.03
+const float kP = 6;  //7
+const float kI = 0;
+const float kD = 0.01; //2 0.03
 
 //For turning
-const double turning_kP = 0; //less than .1 
-const double turning_kI = 0; //should be a really small number 0.024 example
-const double turning_kD = 0; //less than .05 usually
+const float turning_kP = 0; //less than .1 
+const float turning_kI = 0; //should be a really small number 0.024 example
+const float turning_kD = 0; //less than .05 usually
 
 //Initializing other variables for PID. These will be changed by the function, not the user.
 //distance errors
@@ -1394,12 +1340,12 @@ bool enableDrivePID = false;
 double previousDistanceTravelled = 0;
 
 //Variables for desired location
-double desiredTurnValue = 0;
-double targetDistance = 0;
+float desiredTurnValue = 0;
+float targetDistance = 0;
 
 double totalDistanceTravelled = 0;
 
-int timerCount = 0;
+short timerCount = 0;
 
 //PID function for driving
 void drivePID(void* param) {
@@ -1484,7 +1430,7 @@ void drivePID(void* param) {
         prevHeadingError = headingError;
         pros::delay(20); //waits 20 milliseconds before next loop
     }
-}
+}*/
 
 
 //////////////////////////////////////////////
@@ -1492,137 +1438,71 @@ void drivePID(void* param) {
 //////////////////////////////////////////////
 // Begin project code
 bool isAutonomous = true;
-int xpos = -1;
-int ypos = -1;
+bool isSelectingPreAuton = true;
 
-void trackTouch(void* param) {
-    while (isAutonomous) {
-        // PROS uses LVGL for screen touch, different API than VEXcode
-        // This would need to be implemented with LVGL touch callbacks
-        // For now, this is a placeholder structure
-        pros::delay(20);
+char preAutonSelection;
+std::string autonDescription[6] = {"", "Drive Forward", "East 1 Goal", "East 2 Goal", "West 1 Goal", "West 2 Goal"};
+std::string autonDescriptionSkills[3] = {"", "Auton", "Driver"};
+std::string teamDescription[3] = {"Red", "Blue", "Skills"};
+
+int teamIndex = 0;
+int indexOption = 0;
+/* 0 = DriveForward, 1 = East 1 Goal, 2 = East 2 Goal, 3 = West 1 Goal, 4 = West 2 Goal*/
+char redTypeOptions[5] = {'A', 'B', 'C', 'D', 'E'};
+char blueTypeOptions[5] = {'F', 'G', 'H', 'I', 'J'}; // 0 = left, 1 = right, 2 = forward
+char skillsTypeOptions[2] = {'K', 'L'}; // 0 = Auton, 1 = Driver
+
+char matchType[3] = {redTypeOptions[indexOption], blueTypeOptions[indexOption], skillsTypeOptions[indexOption]}; // red, blue, skills
+
+void changeGameType() {
+    teamIndex = (teamIndex + 1) % 3; // Cycle through matchType indices 0-2
+    indexOption = 0; // Reset indexOption when changing game type
+    matchType[0] = redTypeOptions[indexOption];
+    matchType[1] = blueTypeOptions[indexOption];
+    matchType[2] = skillsTypeOptions[indexOption];
+}
+
+void changeGameTypeOption() {
+    if (teamIndex == 0) {
+        indexOption = (indexOption + 1) % 5; // Cycle through redTypeOptions indices 0-4
+        matchType[0] = redTypeOptions[indexOption];
+    } else if (teamIndex == 1) {
+        indexOption = (indexOption + 1) % 5; // Cycle through blueTypeOptions indices 0-4
+        matchType[1] = blueTypeOptions[indexOption];
+    } else if (teamIndex == 2) {
+        indexOption = (indexOption + 1) % 2; // Cycle through skillsTypeOptions indices 0-1
+        matchType[2] = skillsTypeOptions[indexOption];
     }
 }
 
-char preAutonSelector;
-bool isLeft = false;
-bool isRight = false;
-
-void blueSelectGoalNumber() {
-    pros::delay(400);
-    if (xpos >= 0 && xpos < 240 && isLeft == true) { // Left 1 goal
-        preAutonSelector = 'E';
-    } else if (xpos >= 240 && xpos <= 480 && isLeft == true) { // Left 2 goal
-        preAutonSelector = 'D';
-    } else if (xpos >= 0 && xpos < 240 && isRight == true) { // Right 1 goal
-        preAutonSelector = 'C';
-    } else if (xpos >= 240 && xpos <= 480 && isRight == true) { // Right 2 goal
-        preAutonSelector = 'B';
+void confirmPreAutonSelection(){
+    if (teamIndex == 0) {
+        preAutonSelection = redTypeOptions[indexOption];
+    } else if (teamIndex == 1) {
+        preAutonSelection = blueTypeOptions[indexOption];
+    } else if (teamIndex == 2) {
+        preAutonSelection = skillsTypeOptions[indexOption];
     }
+    isSelectingPreAuton = false;
 }
 
-void redSelectGoalNumber() {
-    pros::delay(400);
-    if (xpos >= 0 && xpos < 240 && isLeft == true) { // Left 1 goal
-        preAutonSelector = 'I';
-    } else if (xpos >= 240 && xpos <= 480 && isLeft == true) { // Left 2 goal
-        preAutonSelector = 'J';
-    } else if (xpos >= 0 && xpos < 240 && isRight == true) { // Right 1 goal
-        preAutonSelector = 'G';
-    } else if (xpos >= 240 && xpos <= 480 && isRight == true) { // Right 2 goal
-        preAutonSelector = 'H';
+int preAutonSelector() {
+    while(isSelectingPreAuton) {
+        std::string displayText = "PreAuton Selector: " + teamDescription[teamIndex] + " ";
+        
+        if (teamIndex == 0 || teamIndex == 1) {
+            displayText += autonDescription[indexOption + 1];
+        } else {
+            displayText += autonDescriptionSkills[indexOption + 1];
+        }
+        
+        pros::lcd::print(7, displayText.c_str());
+        pros::lcd::register_btn0_cb(changeGameTypeOption);
+        pros::lcd::register_btn1_cb(changeGameType);
+        pros::lcd::register_btn2_cb(confirmPreAutonSelection);
+        pros::delay(100);
     }
-}
-
-void blueSelect () {
-    pros::delay(400);
-    if (xpos >= 0 && xpos < 160) { // For Left Side
-        // Brain screen drawing would use LVGL
-        isLeft = true;
-        
-        //1 Goal Button
-        //2 Goals Button
-        // LVGL implementation needed here
-        
-    } else if (xpos >= 160 && xpos < 320) { // For Right Side
-        // Brain screen drawing would use LVGL
-        isRight = true;
-        
-        //1 Goal Button
-        //2 Goals Button
-        // LVGL implementation needed here
-        
-    } else if (xpos >= 320) { // For Going Forward
-        preAutonSelector = 'A';
-    }
-}
-
-void redSelect () {
-    pros::delay(400);
-    if (xpos >= 0 && xpos < 160) { // For Left Side
-        // Brain screen drawing would use LVGL
-        isLeft = true;
-        
-        //1 Goal Button
-        //2 Goals Button
-        // LVGL implementation needed here
-        
-    } else if (xpos >= 160 && xpos < 320) { //For Right Side
-        // Brain screen drawing would use LVGL
-        isRight = true;
-        
-        //1 Goal Button
-        //2 Goals Button
-        // LVGL implementation needed here
-        
-    } else if (xpos >= 320) { // For Going Forward
-        preAutonSelector = 'F';
-    }
-}
-
-void skillsSelect () {
-    pros::delay(400);
-
-    if (xpos >= 0 && xpos < 240) {
-        preAutonSelector = 'L';
-    } else if (xpos >= 240 && xpos <= 480) {
-        preAutonSelector = 'K';
-    }
-}
-
-void secondPage() {
-    pros::delay(400);
-    if (xpos >= 0 && xpos < 160) { // Red Side
-        // Brain screen drawing would use LVGL
-        
-        //Left Side Button
-        //Right Side Button
-        //Drive Forward Button
-        // LVGL implementation needed here
-        
-    } else if (xpos >= 160 && xpos < 320) { // Blue Side
-        // Brain screen drawing would use LVGL
-        
-        //Left Side Button
-        //Right Side Button
-        //Drive Forward Button
-        // LVGL implementation needed here
-        
-    } else if (xpos >= 320) { // For Skills
-        // Brain screen drawing would use LVGL
-        
-        //Driver Skills Button
-        //Auton Skills Button
-        // LVGL implementation needed here
-    }
-}
-
-void firstPage() {
-    // Brain screen drawing would use LVGL
-    //Red Button
-    //Blue Button
-    //Skills Button
-    // LVGL implementation needed here
+    return 0;
 }
 
 //////////////////////////////////////////////
@@ -1634,12 +1514,17 @@ void firstPage() {
  */
 void initialize() {
     // actions to do when the program starts
+    //Initialize LVGL brain screen
+
     //Set initial brain state
+    pros::lcd::initialize();
     pros::lcd::set_text(1, "pre auton code");
+
     
     rotationalLateral.reset_position(); //resetting the rotational sensor position to 0
     rotationalHorizontal.reset_position(); //resetting the rotational sensor position to 0
     
+    rotationalHorizontal.set_reversed(true);
     //calibrating the inertial sensor MUST DO THIS
     inertialSensor.reset();
     while (inertialSensor.is_calibrating()) {
@@ -1647,9 +1532,9 @@ void initialize() {
     }
     
     // Track touch task for auton selector
-    pros::Task trackTouch_Thread(trackTouch);
+    // pros::Task trackTouch_Thread(trackTouch);
     //Calls auton selector
-    firstPage();
+    // firstPage();
     
     pros::lcd::set_text(2, "Calibration Complete");
 }
@@ -1689,9 +1574,9 @@ void autonomous() {
     hoodMotor.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
     
     if (inertialSensor.is_calibrating() == false) {
+        inertialSensor.tare_rotation();
         inertialSensor.set_heading(90); //sets the heading to 90 degrees to match field orientation
         robotPosition.at(2,0) = 90;
-        inertialSensor.tare_rotation();
     }
     
     scraperState = false;
@@ -1707,89 +1592,119 @@ void autonomous() {
     // pros::Task graph_Thread(graphTask);
     
     // place automonous code here
-    // switch (preAutonSelector) {
-    //   case 'A': // Blue Drive Forward
-    //     isRedTeam = false;
-    //     colorSort(isRedTeam);
-    //     blueDriveForwardPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'B': // Blue East 1 Goal
-    //     isRedTeam = false;
-    //     colorSort(isRedTeam);
-    //     blueEast1GoalPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'C': // Blue East 2 Goal
-    //     isRedTeam = false;
-    //     colorSort(isRedTeam);
-    //     blueEast2GoalPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'D': // Blue West 1 Goal
-    //     isRedTeam = false;
-    //     colorSort(isRedTeam);
-    //     blueWest1GoalPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'E': // Blue West 2 Goal
-    //     isRedTeam = false;
-    //     colorSort(isRedTeam);
-    //     blueWest2GoalPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'F': // Red Drive Forward
-    //     isRedTeam = true;
-    //     colorSort(isRedTeam);
-    //     redDriveForwardPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'G': // Red East 1 Goal
-    //     isRedTeam = true;
-    //     colorSort(isRedTeam);
-    //     redEast1GoalPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'H': // Red East 2 Goal
-    //     isRedTeam = true;
-    //     colorSort(isRedTeam);
-    //     redEast2GoalPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'I': // Red West 1 Goal
-    //     isRedTeam = true;
-    //     colorSort(isRedTeam);
-    //     redWest1GoalPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'J': // Red West 2 Goal
-    //     isRedTeam = true;
-    //     colorSort(isRedTeam);
-    //     redWest2GoalPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'K': // Auton Skills
-    //     autoSkillsPath();
-    //     isAutonomous = false;
-    //     break;
-    //   case 'L': // Driver Skills
-    //     break;
-    //   default: // The default case handles invalid operators
-    //     break;
-    // }
+    while(isSelectingPreAuton == true) {
+        switch (preAutonSelection) {
+            case 'A': // Blue Drive Forward
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Blue Drive Forward");
+                isRedTeam = false;
+                colorSort(isRedTeam);
+                blueDriveForwardPath();
+                isAutonomous = false;
+                break;
+            case 'B': // Blue East 1 Goal
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Blue East 1 Goal");
+                isRedTeam = false;
+                colorSort(isRedTeam);
+                blueEast1GoalPath();
+                isAutonomous = false;
+                break;
+            case 'C': // Blue East 2 Goal
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Blue East 2 Goal");
+                isRedTeam = false;
+                colorSort(isRedTeam);
+                blueEast2GoalPath();
+                isAutonomous = false;
+                break;
+            case 'D': // Blue West 1 Goal
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Blue West 1 Goal");
+                isRedTeam = false;
+                colorSort(isRedTeam);
+                blueWest1GoalPath();
+                isAutonomous = false;
+                break;
+            case 'E': // Blue West 2 Goal
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Blue West 2 Goal");
+                isRedTeam = false;
+                colorSort(isRedTeam);
+                blueWest2GoalPath();
+                isAutonomous = false;
+                break;
+            case 'F': // Red Drive Forward
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Red Drive Forward");
+                isRedTeam = true;
+                colorSort(isRedTeam);
+                redDriveForwardPath();
+                isAutonomous = false;
+                break;
+            case 'G': // Red East 1 Goal
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Red East 1 Goal");
+                isRedTeam = true;
+                colorSort(isRedTeam);
+                redEast1GoalPath();
+                isAutonomous = false;
+                break;
+            case 'H': // Red East 2 Goal
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Red East 2 Goal");
+                isRedTeam = true;
+                colorSort(isRedTeam);
+                redEast2GoalPath();
+                isAutonomous = false;
+                break;
+            case 'I': // Red West 1 Goal
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Red West 1 Goal");
+                isRedTeam = true;
+                colorSort(isRedTeam);
+                redWest1GoalPath();
+                isAutonomous = false;
+                break;
+            case 'J': // Red West 2 Goal
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Red West 2 Goal");
+                isRedTeam = true;
+                colorSort(isRedTeam);
+                redWest2GoalPath();
+                isAutonomous = false;
+                break;
+            case 'K': // Auton Skills
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Auton Skills");
+                autoSkillsPath();
+                isAutonomous = false;
+                break;
+            case 'L': // Driver Skills
+                isSelectingPreAuton = false;
+                pros::lcd::set_text(1, "Driver Skills");
+                isAutonomous = false;
+                break;
+            default: // The default case handles invalid operators
+                pros::lcd::set_text(1, "Select Auton");
+        }
+        pros::delay(100);
+    }
 }
 
 /**
  * Runs the operator control code.
  */
 void opcontrol() {
-    pros::Task odometry_Thread(odometry);
-    
-    enableDrivePID = false; //disables PID control during user control
+    robotPosition.at(0,0) = 0; //x position in inches
+    robotPosition.at(1,0) = 0; //y position in inches
+    robotPosition.at(2,0) = 90; //heading in degrees
+    pros::Task odometry_Thread(odometry, nullptr, TASK_PRIORITY_DEFAULT, 16384, "Odometry");    //pros::Task odometryTest_Thread(odometryTest);
+    // enableDrivePID = false; //disables PID control during user control
     pros::lcd::set_text(1, "driver control");
         
-    LeftDriveSmart.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-    RightDriveSmart.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
+    LeftDriveSmart.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
+    RightDriveSmart.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
     intakeMotor.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
     hoodMotor.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
         
@@ -1797,14 +1712,14 @@ void opcontrol() {
 
     while(true){
         // Display position info periodically
-        // static int displayCounter = 0;
-        // if (displayCounter % 400 == 0) { // Every ~4 seconds (400 * 10ms)
-        //   pros::lcd::clear();
-        //   pros::lcd::set_text(1, "x: " + std::to_string(robotPosition.at(0,0)));
-        //   pros::lcd::set_text(2, "y: " + std::to_string(robotPosition.at(1,0)));
-        //   pros::lcd::set_text(3, "Heading: " + std::to_string(robotPosition.at(2,0)));
-        // }
-        // displayCounter++;
+        static int displayCounter = 0;
+        if (displayCounter % 400 == 0) { // Every ~4 seconds (400 * 10ms)
+          pros::lcd::clear();
+          pros::lcd::set_text(1, "x: " + std::to_string(robotPosition.at(0,0)));
+          pros::lcd::set_text(2, "y: " + std::to_string(robotPosition.at(1,0)));
+          pros::lcd::set_text(3, "Heading: " + std::to_string(robotPosition.at(2,0)));
+        }
+        displayCounter++;
         
         // Arcade drive with quadratic curve
         double joyLeft = Controller1.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
@@ -1825,7 +1740,7 @@ void opcontrol() {
             
         input();
 
-        testMotionLimits();
+        //testMotionLimits();
             
         pros::delay(10);
     }
