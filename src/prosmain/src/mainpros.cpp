@@ -1699,6 +1699,7 @@ void opcontrol() {
     robotPosition.at(0,0) = 0; //x position in inches
     robotPosition.at(1,0) = 0; //y position in inches
     robotPosition.at(2,0) = 90; //heading in degrees
+
     pros::Task odometry_Thread(odometry, nullptr, TASK_PRIORITY_DEFAULT, 16384, "Odometry");    //pros::Task odometryTest_Thread(odometryTest);
     // enableDrivePID = false; //disables PID control during user control
     pros::lcd::set_text(1, "driver control");
@@ -1712,16 +1713,16 @@ void opcontrol() {
 
     while(true){
         // Display position info periodically
-        static int displayCounter = 0;
-        if (displayCounter % 400 == 0) { // Every ~4 seconds (400 * 10ms)
-          pros::lcd::clear();
-          pros::lcd::set_text(1, "x: " + std::to_string(robotPosition.at(0,0)));
-          pros::lcd::set_text(2, "y: " + std::to_string(robotPosition.at(1,0)));
-          pros::lcd::set_text(3, "Heading: " + std::to_string(robotPosition.at(2,0)));
-        }
-        displayCounter++;
+        // static int displayCounter = 0;
+        // if (displayCounter % 400 == 0) { // Every ~4 seconds (400 * 10ms)
+        //   pros::lcd::clear();
+        //   pros::lcd::set_text(1, "x: " + std::to_string(robotPosition.at(0,0)));
+        //   pros::lcd::set_text(2, "y: " + std::to_string(robotPosition.at(1,0)));
+        //   pros::lcd::set_text(3, "Heading: " + std::to_string(robotPosition.at(2,0)));
+        // }
+        // displayCounter++;
         
-        // Arcade drive with quadratic curve
+        // Arcade drive with cubic curve
         double joyLeft = Controller1.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         double joyRight = Controller1.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
         
@@ -1729,11 +1730,11 @@ void opcontrol() {
         if (abs(joyLeft) < 5) joyLeft = 0;
         if (abs(joyRight) < 5) joyRight = 0;
         
-        // Quadratic curve for smoother control
+        // Cubic curve for smoother control
         double left = joyLeft + joyRight;
         double right = joyLeft - joyRight;
-        int leftSideSpeed = (left * abs(left)) / 127;
-        int rightSideSpeed = (right * abs(right)) / 127;
+        int leftSideSpeed = pow(left, 3) / (127 * 127);
+        int rightSideSpeed = pow(right, 3) / (127 * 127);
         
         LeftDriveSmart.move(leftSideSpeed);
         RightDriveSmart.move(rightSideSpeed);
